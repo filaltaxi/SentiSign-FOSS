@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+models/
+slm/models/
+*.wav
+*.log
+*.bak*
+.tmp_*
+.vscode/

@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────
+# SentiSign requirements.txt
+# Install with:  pip install -r requirements.txt
+# Python 3.10 recommended
+# ─────────────────────────────────────────────────────────────
+
+# TTS — Chatterbox (real emotion control via exaggeration + cfg_weight)
+chatterbox-tts
+
+# Sentence generation — flan-t5-large
+# torch + transformers already pulled in by chatterbox-tts
+sentencepiece          # REQUIRED by T5Tokenizer — do not skip
+accelerate             # speeds up flan-t5-large on GPU
+
+# Audio playback — no SOX, no system dependencies
+sounddevice
+scipy
+numpy
+opencv-python==4.8.1.78

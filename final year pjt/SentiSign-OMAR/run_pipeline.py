@@ -1,0 +1,143 @@
+# run_pipeline.py
+# ─────────────────────────────────────────────────────────────────────────────
+# SentiSign — Main Pipeline Entry Point  [Phase 2]
+#
+# Phase 1 (done): Manual words + emotion input
+# Phase 2 (done): Emotion auto-detected from webcam via ResNet CNN
+# Phase 3 (next): Words auto-recognised from webcam via Sign Recognition
+#
+# Pipeline:
+#   words (still manual)  +  emotion (ResNet webcam detection)
+#       │                          │
+#       │               continuous webcam → emotion counts
+#       │               → winner or user resolves tie
+#       └──────────┬───────────────┘
+#                  ▼  flan-t5-large
+#       grammatically correct English sentence
+#                  ▼  Chatterbox-TTS (exaggeration + cfg_weight)
+#              🔊  emotion-expressive audio
+# ─────────────────────────────────────────────────────────────────────────────
+
+import os, sys
+import sys, os
+if ".venv" not in sys.executable and "venv" not in sys.executable:
+    print("⚠  WARNING: venv does not appear to be active.")
+    print("   Run: .venv\\Scripts\\activate.bat")
+    print("   Then re-run the pipeline.\n")
+
+_ROOT    = os.path.dirname(os.path.abspath(__file__))
+_SRC     = os.path.join(_ROOT, "src")
+_SLM_SRC = os.path.join(_ROOT, "slm", "src")
+
+for p in [_SRC, _SLM_SRC]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+from emotion_map       import list_emotions, print_emotion_table
+from generate_sentence import words_to_sentence
+from tts               import speak, speak_and_save
+from emotion_detector  import capture_emotion
+
+
+# ── Input parsing ─────────────────────────────────────────────────────────────
+
+def parse_words(raw: str) -> list:
+    sep   = "," if "," in raw else " "
+    words = [w.strip() for w in raw.split(sep) if w.strip()]
+    if not words:
+        raise ValueError("No words found. Enter at least one word.")
+    return words
+
+
+def get_inputs() -> tuple:
+    supported = list_emotions()
+
+    print("\n" + "═" * 64)
+    print("  SentiSign  |  Sign Language → Emotion-Aware Speech")
+    print("  Models: flan-t5-large  +  Chatterbox-TTS  +  ResNet Emotion")
+    print("═" * 64)
+    print_emotion_table()
+
+    # ── Step 1: Words (still manual — Phase 3 will automate) ─────────────────
+    print("\n  Enter sign language words (comma or space separated):")
+    print("  Examples:")
+    print("    I, TOMORROW, HOSPITAL, GO")
+    print("    HUNGRY I FOOD WANT")
+    print("    MOTHER SICK DOCTOR NEED")
+
+    while True:
+        raw = input("\n  Words > ").strip()
+        if not raw:
+            print("  ⚠  Please enter at least one word.")
+            continue
+        try:
+            words = parse_words(raw)
+            print(f"  ✓  {len(words)} word(s): {words}")
+            break
+        except ValueError as e:
+            print(f"  ⚠  {e}")
+
+    # ── Step 2: Emotion from webcam ───────────────────────────────────────────
+    print("\n  Next: webcam will open for emotion detection.")
+    print("  Express your emotion, then press ENTER in this terminal when done.")
+    input("  Press ENTER here to open the webcam > ")
+
+    emotion = capture_emotion()
+
+    return words, emotion
+
+
+# ── Pipeline run ──────────────────────────────────────────────────────────────
+
+def run():
+    words, emotion = get_inputs()
+
+    # Step 1 — sentence generation
+    print("\n" + "─" * 64)
+    print("  [1/2]  Generating sentence from words ...")
+    sentence = words_to_sentence(words)
+    print(f"\n  ✓  Sentence: \"{sentence}\"")
+
+    # Step 2 — TTS with emotion
+    print("\n" + "─" * 64)
+    print(f"  [2/2]  Synthesising speech  (emotion: {emotion}) ...")
+
+    save_q = input("\n  Save audio as .wav? (y/n, default n) > ").strip().lower()
+    if save_q == "y":
+        default = f"sentisign_{emotion}.wav"
+        fname   = input(f"  Filename (default: {default}) > ").strip()
+        path    = fname if fname else default
+        speak_and_save(sentence, emotion=emotion, path=path, also_play=True)
+        print(f"\n  ✓  Saved: {path}")
+    else:
+        speak(sentence, emotion=emotion, play=True)
+
+    # Summary
+    print("\n" + "═" * 64)
+    print("  ✓  Pipeline complete")
+    print(f"  Words    : {words}")
+    print(f"  Sentence : \"{sentence}\"")
+    print(f"  Emotion  : {emotion}")
+    print("═" * 64)
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    print("\n  All models load on the FIRST run only.")
+    print("  Subsequent runs reuse loaded models — much faster.\n")
+
+    while True:
+        try:
+            run()
+        except KeyboardInterrupt:
+            print("\n\n  Stopped.")
+            break
+        except Exception as e:
+            print(f"\n  ✗  Error: {e}")
+            import traceback; traceback.print_exc()
+
+        again = input("\n  Run again? (y/n) > ").strip().lower()
+        if again != "y":
+            print("  Goodbye.")
+            break
