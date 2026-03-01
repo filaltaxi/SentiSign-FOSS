@@ -3,7 +3,6 @@
 
 # Large model files (too big for GitHub)
 models/asl/asl_cnn_transformer.pth
-models/landmark/landmark_mlp.pth
 models/landmark/landmark_rf.pkl
 
 # Collected landmark data (machine-specific)
