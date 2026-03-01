@@ -39,15 +39,25 @@ git clone https://github.com/filaltaxi/SentiSign-OMAR.git
 cd SentiSign-OMAR
 ```
 
-**2 — Create virtual environment**
+> If your checkout contains `final year pjt/SentiSign-OMAR/`, run the app from there:
+```bash
+cd "final year pjt/SentiSign-OMAR"
+```
+
+**2 — Create virtual environment (pip)**
 ```bash
 python -m venv .venv
 .venv\Scripts\activate.bat
 ```
 
-**3 — Install dependencies**
+**3 — Install dependencies (pip)**
 ```bash
 pip install -r requirements.txt
+```
+
+**Alternative: install + run with `uv`**
+```bash
+uv sync
 ```
 
 **4 — Download models**
@@ -88,6 +98,12 @@ python -X utf8 src\sign_recognizer.py
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 Open `http://localhost:8000` in your browser. Wait for all models to load (loading screen fades automatically).
+
+**With `uv`**
+```bash
+uv run python run_pipeline.py
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
 
 ---
 

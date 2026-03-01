@@ -15,13 +15,17 @@ accelerate             # speeds up flan-t5-large on GPU
 # Audio playback — no SOX, no system dependencies
 sounddevice
 scipy
-numpy
+# mediapipe is not compatible with numpy 2.x (ABI break)
+numpy<2.0
 opencv-python==4.8.1.78
 mediapipe==0.10.9
 torchvision==0.21.0
 onnx==1.14.1
 protobuf==3.20.3
 scikit-learn
+pandas
+pillow
+transformers
 fastapi
 uvicorn[standard]
 python-multipart

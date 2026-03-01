@@ -247,23 +247,33 @@ def capture_words_and_emotion() -> tuple:
     print('  Your facial expression is read automatically.')
     print(f'  Session ends after {FLUSH_SECONDS}s pause or press ENTER.\n')
 
-    # Load models
+    # Load models (landmark MLP is optional; emotion model can run without it)
+    mlp_model = None
+    idx_to_label = None
     try:
         mlp_model, idx_to_label = _load_mlp()
     except FileNotFoundError as e:
         print(f'  {e}')
-        return _manual_word_fallback(), DEFAULT_EMOTION
+        print('  Continuing with emotion-only webcam session; words will be manual.')
 
     emo_model, face_cascade = _load_emotion_model()
     device = _get_device()
 
-    try:
-        import mediapipe as mp
-        _hands_module = mp.solutions.hands
-        _drawing      = mp.solutions.drawing_utils
-    except ImportError:
-        print('  Error: mediapipe not installed.')
-        return _manual_word_fallback(), DEFAULT_EMOTION
+    hands = None
+    _hands_module = None
+    _drawing = None
+    if mlp_model is not None:
+        try:
+            import mediapipe as mp
+            _hands_module = mp.solutions.hands
+            _drawing      = mp.solutions.drawing_utils
+            hands = _hands_module.Hands(
+                static_image_mode=False, max_num_hands=1,
+                min_detection_confidence=0.7, min_tracking_confidence=0.6,
+            )
+        except ImportError:
+            print('  Warning: mediapipe not installed; sign recognition disabled.')
+            hands = None
 
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -286,11 +296,7 @@ def capture_words_and_emotion() -> tuple:
         enter_pressed.set()
     threading.Thread(target=_wait_enter, daemon=True).start()
 
-    with _hands_module.Hands(
-        static_image_mode=False, max_num_hands=1,
-        min_detection_confidence=0.7, min_tracking_confidence=0.6,
-    ) as hands:
-
+    try:
         while not enter_pressed.is_set():
 
             if word_buffer and time.time() - last_word_time > FLUSH_SECONDS:
@@ -302,36 +308,38 @@ def capture_words_and_emotion() -> tuple:
                 break
             frame_count += 1
 
-            # ── SIGN RECOGNITION (every frame via landmarks) ───────────────
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results   = hands.process(frame_rgb)
             cls_name, confidence = '', 0.0
 
-            if results.multi_hand_landmarks:
-                hand_lm = results.multi_hand_landmarks[0]
-                _drawing.draw_landmarks(
-                    frame, hand_lm, _hands_module.HAND_CONNECTIONS)
+            # ── SIGN RECOGNITION (every frame via landmarks, if enabled) ───
+            if hands is not None and _hands_module is not None and _drawing is not None:
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results   = hands.process(frame_rgb)
 
-                cls_name, confidence = _classify_landmarks(
-                    mlp_model, idx_to_label, hand_lm.landmark, device)
+                if results.multi_hand_landmarks:
+                    hand_lm = results.multi_hand_landmarks[0]
+                    _drawing.draw_landmarks(
+                        frame, hand_lm, _hands_module.HAND_CONNECTIONS)
 
-                # Hold logic
-                if cls_name == current_cls and confidence >= MIN_CONFIDENCE:
-                    hold_counter += 1
-                else:
-                    current_cls  = cls_name
-                    hold_counter = 0
+                    cls_name, confidence = _classify_landmarks(
+                        mlp_model, idx_to_label, hand_lm.landmark, device)
 
-                # Register word when held long enough
-                if (hold_counter >= HOLD_FRAMES
-                        and cls_name in CLASS_TO_WORD
-                        and CLASS_TO_WORD[cls_name] is not None):
-                    word = CLASS_TO_WORD[cls_name]
-                    if not word_buffer or word_buffer[-1] != word:
-                        word_buffer.append(word)
-                        last_word_time = time.time()
-                        hold_counter   = 0
-                        print(f'  + [{cls_name}] -> {word:<14}  Words: {word_buffer}')
+                    # Hold logic
+                    if cls_name == current_cls and confidence >= MIN_CONFIDENCE:
+                        hold_counter += 1
+                    else:
+                        current_cls  = cls_name
+                        hold_counter = 0
+
+                    # Register word when held long enough
+                    if (hold_counter >= HOLD_FRAMES
+                            and cls_name in CLASS_TO_WORD
+                            and CLASS_TO_WORD[cls_name] is not None):
+                        word = CLASS_TO_WORD[cls_name]
+                        if not word_buffer or word_buffer[-1] != word:
+                            word_buffer.append(word)
+                            last_word_time = time.time()
+                            hold_counter   = 0
+                            print(f'  + [{cls_name}] -> {word:<14}  Words: {word_buffer}')
 
             # ── EMOTION RECOGNITION (every Nth frame) ─────────────────────
             if frame_count % EMOTION_EVERY_N == 0:
@@ -355,14 +363,19 @@ def capture_words_and_emotion() -> tuple:
             top_emo   = emotion_votes.most_common(1)[0][0] \
                         if emotion_votes else '?'
 
-            cv2.putText(frame,
-                f'Sign: {cls_name} ({confidence:.0%}) -> {word_disp}',
-                (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
+            if hands is not None:
+                cv2.putText(frame,
+                    f'Sign: {cls_name} ({confidence:.0%}) -> {word_disp}',
+                    (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
 
-            # Hold progress bar
-            bar_w = int((min(hold_counter, HOLD_FRAMES) / HOLD_FRAMES) * 180)
-            cv2.rectangle(frame, (10, 38), (190, 52), (40, 40, 40), -1)
-            cv2.rectangle(frame, (10, 38), (10 + bar_w, 52), (0, 255, 0), -1)
+                # Hold progress bar
+                bar_w = int((min(hold_counter, HOLD_FRAMES) / HOLD_FRAMES) * 180)
+                cv2.rectangle(frame, (10, 38), (190, 52), (40, 40, 40), -1)
+                cv2.rectangle(frame, (10, 38), (10 + bar_w, 52), (0, 255, 0), -1)
+            else:
+                cv2.putText(frame,
+                    'Sign: (disabled)  Words: manual',
+                    (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
 
             cv2.putText(frame, f'Words: {buf_disp}',
                 (10, 74), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 0), 2)
@@ -376,6 +389,9 @@ def capture_words_and_emotion() -> tuple:
 
             cv2.imshow('SentiSign  |  Sign + Emotion', frame)
             cv2.waitKey(1)
+    finally:
+        if hands is not None:
+            hands.close()
 
     cap.release()
     cv2.destroyAllWindows()

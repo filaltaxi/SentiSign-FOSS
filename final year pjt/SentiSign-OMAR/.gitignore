@@ -1,9 +1,14 @@
 # Virtual environment
 .venv/
+uv.lock
+**/.DS_Store
 
 # Large model files (too big for GitHub)
 models/asl/asl_cnn_transformer.pth
 models/landmark/landmark_rf.pkl
+models/landmark/label_map.json
+models/emotion/resnet_emotion.pth
+slm/models/
 
 # Collected landmark data (machine-specific)
 data/landmarks/raw/

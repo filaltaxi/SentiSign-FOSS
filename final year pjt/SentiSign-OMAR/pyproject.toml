@@ -1,0 +1,38 @@
+[project]
+name = "sentisign"
+version = "0.1.0"
+description = "Multimodal Sign Language and Emotion-Aware Speech Synthesis"
+readme = "SETUP.md"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+  "accelerate",
+  "chatterbox-tts",
+  "fastapi",
+  "mediapipe==0.10.9",
+  "numpy<2.0",
+  "onnx==1.14.1",
+  "opencv-python==4.8.1.78",
+  "pandas",
+  "pillow",
+  "protobuf==3.20.3",
+  "python-multipart",
+  "scikit-learn",
+  "scipy",
+  "sentencepiece",
+  "sounddevice",
+  "transformers",
+  "torchvision==0.21.0",
+  "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+train = [
+  "matplotlib",
+  "seaborn",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.extra-build-dependencies]
+pkuseg = ["numpy<2.0"]

@@ -3,6 +3,28 @@
 
 ---
 
+## Using `uv` (recommended)
+
+From the `SentiSign-OMAR/` folder:
+
+```bash
+uv sync
+uv run python slm/download_model.py
+uv run python run_pipeline.py
+```
+
+Web UI:
+```bash
+uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+If you want to run training/retraining tools (plots, etc.):
+```bash
+uv sync --extra train
+```
+
+---
+
 ## Project Structure
 ```
 SentiSign-OMAR/
