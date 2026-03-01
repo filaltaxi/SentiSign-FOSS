@@ -39,11 +39,6 @@ git clone https://github.com/filaltaxi/SentiSign-OMAR.git
 cd SentiSign-OMAR
 ```
 
-> If your checkout contains `final year pjt/SentiSign-OMAR/`, run the app from there:
-```bash
-cd "final year pjt/SentiSign-OMAR"
-```
-
 **2 — Create virtual environment (pip)**
 ```bash
 python -m venv .venv
@@ -58,6 +53,7 @@ pip install -r requirements.txt
 **Alternative: install + run with `uv`**
 ```bash
 uv sync
+uv run python run_pipeline.py
 ```
 
 **4 — Download models**
@@ -90,7 +86,7 @@ Takes under 2 minutes on GPU.
 
 **Desktop pipeline (terminal)**
 ```bash
-python -X utf8 src\sign_recognizer.py
+python run_pipeline.py
 ```
 
 **Web interface**
@@ -116,11 +112,11 @@ SentiSign-OMAR/
 ├── collect_landmarks.py            # Training data collection
 ├── train_landmark_classifier.py    # MLP + RF training
 ├── requirements.txt
+├── pyproject.toml                  # uv support
 │
 ├── src/
 │   ├── sign_recognizer.py          # Desktop pipeline (terminal)
 │   ├── emotion_detector.py         # ResNet FER
-│   ├── generate_sentence.py        # Flan-T5-Large NLG
 │   ├── tts.py                      # Chatterbox TTS
 │   └── emotion_map.py              # Emotion → prosody parameters
 │
@@ -137,7 +133,8 @@ SentiSign-OMAR/
 │   └── emotion/                    # ResNet weights (not in repo)
 │
 ├── slm/
-│   └── models/flan-t5-large/       # Language model (auto-downloaded)
+│   ├── models/flan-t5-large/       # Language model (auto/down/manual)
+│   └── src/                        # Sentence generation
 │
 └── data/
     └── landmarks/

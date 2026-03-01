@@ -5,7 +5,7 @@
 
 ## Using `uv` (recommended)
 
-From the `SentiSign-OMAR/` folder:
+From the repo root:
 
 ```bash
 uv sync
@@ -51,7 +51,7 @@ SentiSign-OMAR/
 Open Command Prompt in your project folder:
 
 ```bat
-cd "C:\Users\Omar sheriff h\Desktop\project\final year pjt\SentiSign-OMAR"
+cd "C:\path\to\SentiSign-OMAR"
 ```
 
 Create venv:
@@ -80,7 +80,7 @@ pip install -r requirements.txt
 
 ---
 
-## Step 3 — Download flan-t5-large (~780MB, one time only)
+## Step 3 — Download flan-t5-large (~3.1GB weights, one time only)
 
 ```bat
 python slm\download_model.py
