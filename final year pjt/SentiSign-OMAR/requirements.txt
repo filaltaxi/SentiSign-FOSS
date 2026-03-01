@@ -22,3 +22,6 @@ torchvision==0.21.0
 onnx==1.14.1
 protobuf==3.20.3
 scikit-learn
+fastapi
+uvicorn[standard]
+python-multipart

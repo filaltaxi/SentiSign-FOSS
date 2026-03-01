@@ -9,6 +9,7 @@ models/landmark/landmark_rf.pkl
 # Collected landmark data (machine-specific)
 data/landmarks/raw/
 data/landmarks/processed/
+data/landmarks/references/*.gif
 
 # Generated audio files
 *.wav

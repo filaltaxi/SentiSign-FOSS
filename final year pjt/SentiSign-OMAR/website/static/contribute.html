@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentiSign — Contribute a Sign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e14;--surface:#111720;--border:#1e2d3d;
+  --teal:#00d4aa;--teal-dim:#00907a;--amber:#ffb347;
+  --red:#ff5f5f;--text:#e8f0fe;--muted:#5a7a8a;--radius:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 40px;border-bottom:1px solid var(--border);background:rgba(10,14,20,0.95);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
+.nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;color:var(--teal);}
+.nav-logo span{color:var(--text);}
+.nav-links{display:flex;gap:32px;}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:0.9rem;font-weight:500;transition:color 0.2s;}
+.nav-links a:hover,.nav-links a.active{color:var(--teal);}
+
+.page-wrap{max-width:860px;margin:0 auto;padding:48px 40px;}
+h1{font-family:'Syne',sans-serif;font-weight:800;font-size:2rem;margin-bottom:8px;}
+h1 em{color:var(--teal);font-style:normal;}
+.subtitle{color:var(--muted);margin-bottom:40px;line-height:1.6;max-width:500px;}
+
+/* Step indicator */
+.steps{display:flex;gap:0;margin-bottom:40px;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.step{flex:1;padding:14px 20px;text-align:center;border-right:1px solid var(--border);transition:all 0.3s;}
+.step:last-child{border-right:none;}
+.step.active{background:rgba(0,212,170,0.08);border-bottom:2px solid var(--teal);}
+.step.done{background:rgba(0,212,170,0.04);}
+.step-num{font-family:'Syne',sans-serif;font-weight:800;font-size:1.2rem;color:var(--muted);}
+.step.active .step-num,.step.done .step-num{color:var(--teal);}
+.step-label{font-size:0.75rem;color:var(--muted);margin-top:2px;}
+.step.active .step-label{color:var(--text);}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:24px;}
+.card-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:6px;}
+.card-desc{color:var(--muted);font-size:0.9rem;margin-bottom:20px;line-height:1.5;}
+
+/* Gate states */
+.gate{display:none;}
+.gate.active{display:block;}
+
+/* Input */
+.input-row{display:flex;gap:10px;align-items:center;}
+.text-input{
+  flex:1;background:var(--bg);border:1px solid var(--border);
+  border-radius:10px;padding:12px 16px;
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:1rem;
+  outline:none;transition:border-color 0.2s;
+  text-transform:uppercase;
+}
+.text-input:focus{border-color:var(--teal);}
+.text-input::placeholder{text-transform:none;color:var(--muted);}
+
+.btn{
+  padding:12px 24px;border:none;border-radius:8px;
+  font-family:'DM Sans',sans-serif;font-weight:500;font-size:0.9rem;
+  cursor:pointer;transition:all 0.2s;
+}
+.btn-primary{background:var(--teal);color:#000;}
+.btn-primary:hover{background:#00f0c3;}
+.btn-primary:disabled{background:var(--teal-dim);cursor:not-allowed;opacity:0.6;}
+.btn-secondary{background:transparent;color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--teal);color:var(--teal);}
+.btn-warn{background:rgba(255,179,71,0.15);color:var(--amber);border:1px solid rgba(255,179,71,0.3);}
+.btn-warn:hover{background:rgba(255,179,71,0.25);}
+
+/* Alert boxes */
+.alert{border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:flex-start;gap:12px;font-size:0.9rem;}
+.alert-success{background:rgba(0,212,170,0.08);border:1px solid rgba(0,212,170,0.25);color:var(--teal);}
+.alert-warn{background:rgba(255,179,71,0.08);border:1px solid rgba(255,179,71,0.3);color:var(--amber);}
+.alert-error{background:rgba(255,95,95,0.08);border:1px solid rgba(255,95,95,0.3);color:var(--red);}
+.alert-icon{font-size:1.2rem;flex-shrink:0;}
+
+/* Reference GIF display */
+.ref-display{
+  display:flex;align-items:center;gap:20px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:10px;padding:16px;margin-bottom:16px;
+}
+.ref-gif{width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
+.ref-info h3{font-family:'Syne',sans-serif;font-weight:700;font-size:1.1rem;margin-bottom:4px;}
+.ref-info p{color:var(--muted);font-size:0.85rem;line-height:1.5;}
+
+/* Webcam */
+.cam-wrap{
+  position:relative;background:#000;
+  border-radius:10px;overflow:hidden;
+  aspect-ratio:4/3;margin-bottom:16px;
+}
+.cam-wrap video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1);}
+.cam-wrap canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;transform:scaleX(-1);}
+.cam-overlay{position:absolute;bottom:10px;left:10px;right:10px;
+  background:rgba(0,0,0,0.7);border-radius:8px;padding:8px 12px;
+  font-size:0.8rem;text-align:center;}
+
+/* Progress */
+.progress-wrap{margin-bottom:12px;}
+.progress-label{display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:6px;}
+.progress-label span:first-child{color:var(--muted);}
+.progress-label span:last-child{color:var(--teal);font-weight:600;}
+.progress-bar{height:8px;background:var(--border);border-radius:4px;}
+.progress-fill{height:100%;background:var(--teal);border-radius:4px;transition:width 0.3s;}
+.progress-fill.warn{background:var(--amber);}
+.progress-fill.done{background:var(--teal);}
+
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,0.3);border-top-color:#000;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:600px){
+  .page-wrap{padding:24px 16px;}
+  nav{padding:14px 16px;}
+  .steps{flex-direction:column;}
+  .step{border-right:none;border-bottom:1px solid var(--border);}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Senti<span>Sign</span></div>
+  <div class="nav-links">
+    <a href="/">Communicate</a>
+    <a href="/signs">Signs</a>
+    <a href="/contribute" class="active">Contribute</a>
+    <a href="/about">About</a>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <h1>Contribute a <em>Sign</em></h1>
+  <p class="subtitle">Add a new word to SentiSign's vocabulary. The system checks for duplicates automatically before recording starts.</p>
+
+  <!-- Step indicators -->
+  <div class="steps">
+    <div class="step active" id="step1ind"><div class="step-num">1</div><div class="step-label">Word Check</div></div>
+    <div class="step" id="step2ind"><div class="step-num">2</div><div class="step-label">Gesture Check</div></div>
+    <div class="step" id="step3ind"><div class="step-num">3</div><div class="step-label">Record Sign</div></div>
+    <div class="step" id="step4ind"><div class="step-num">4</div><div class="step-label">Done</div></div>
+  </div>
+
+  <!-- GATE 1: Word check -->
+  <div class="gate active" id="gate1">
+    <div class="card">
+      <div class="card-title">Gate 1 — Word Check</div>
+      <div class="card-desc">Enter the English word you want to add a sign for. We'll check instantly if it already exists.</div>
+      <div class="input-row">
+        <input class="text-input" id="wordInput" type="text" placeholder="e.g. AMBULANCE"
+          onkeydown="if(event.key==='Enter') checkWord()">
+        <button class="btn btn-primary" onclick="checkWord()" id="checkBtn">Check →</button>
+      </div>
+      <div id="gate1Result" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- GATE 2: Gesture check -->
+  <div class="gate" id="gate2">
+    <div class="card">
+      <div class="card-title">Gate 2 — Gesture Check</div>
+      <div class="card-desc" id="gate2Desc">Show us your sign for <strong id="gate2Word"></strong> once so we can check it doesn't look like an existing sign.</div>
+
+      <div class="cam-wrap" id="gate2CamWrap">
+        <video id="gate2Video" autoplay muted playsinline></video>
+        <canvas id="gate2Canvas"></canvas>
+        <div class="cam-overlay" id="gate2CamText">Hold your sign steady for the check</div>
+      </div>
+
+      <div id="gate2Result" style="margin-bottom:16px;"></div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="backToGate1()">← Back</button>
+        <button class="btn btn-primary" id="gate2ContinueBtn" onclick="proceedToRecord()" style="display:none;">
+          Continue to Recording →
+        </button>
+        <button class="btn btn-warn" id="gate2OverrideBtn" onclick="proceedToRecord()" style="display:none;">
+          Override &amp; Continue Anyway
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GATE 3: Recording -->
+  <div class="gate" id="gate3">
+    <div class="card">
+      <div class="card-title">Recording — <span id="recordWord"></span></div>
+      <div class="card-desc">Sign <strong id="recordWordDesc"></strong> repeatedly. Hold each rep clearly. We need at least 100 samples (200 recommended).</div>
+
+      <div class="cam-wrap">
+        <video id="recordVideo" autoplay muted playsinline></video>
+        <canvas id="recordCanvas"></canvas>
+        <div class="cam-overlay" id="recordCamText">Waiting for hand detection...</div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span>Samples collected</span>
+          <span id="sampleCount">0 / 200</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-secondary" onclick="backToGate1()">← Start Over</button>
+        <button class="btn btn-primary" id="submitBtn" onclick="submitSign()" disabled>
+          Submit Sign →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GATE 4: Done -->
+  <div class="gate" id="gate4">
+    <div class="card">
+      <div class="alert alert-success">
+        <div class="alert-icon">✓</div>
+        <div id="successMsg">Sign added successfully!</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="/signs" class="btn btn-secondary">View Signs Gallery</a>
+        <button class="btn btn-primary" onclick="resetAll()">Add Another Sign</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+<script>
+let targetWord    = '';
+let samples       = [];
+let recordCamera  = null;
+let recordHands   = null;
+let gate2Camera   = null;
+let gate2Hands    = null;
+let gate2Done     = false;
+let lastSaveTime  = 0;
+const SAVE_DELAY  = 300;  // ms between saves
+const TARGET      = 200;
+const FLOOR       = 100;
+
+// ── GATE 1 ────────────────────────────────────────────────────────────────────
+async function checkWord() {
+  const word = document.getElementById('wordInput').value.trim().toUpperCase();
+  if (!word) return;
+  const btn = document.getElementById('checkBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Checking...';
+
+  try {
+    const res  = await fetch('/api/signs/check', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({word})
+    });
+    const data = await res.json();
+    const div  = document.getElementById('gate1Result');
+
+    if (data.exists) {
+      // Word already exists — show reference GIF
+      const gifHtml = data.gif_url
+        ? `<img class="ref-gif" src="${data.gif_url}" alt="${word}">`
+        : `<div style="width:120px;height:120px;background:var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2rem;">✋</div>`;
+
+      div.innerHTML = `
+        <div class="alert alert-warn">
+          <div class="alert-icon">⚠</div>
+          <div><strong>${word}</strong> is already in our system. Here is the sign we use:</div>
+        </div>
+        <div class="ref-display">
+          ${gifHtml}
+          <div class="ref-info">
+            <h3>${word}</h3>
+            <p>This word is already mapped to a sign in SentiSign.<br>
+               If you believe a different gesture should be used, you can
+               submit an alternative and it will be reviewed.</p>
+          </div>
+        </div>
+      `;
+    } else {
+      // Word doesn't exist — proceed to Gate 2
+      targetWord = word;
+      div.innerHTML = `
+        <div class="alert alert-success">
+          <div class="alert-icon">✓</div>
+          <div><strong>${word}</strong> is not in our system yet. Proceeding to gesture check.</div>
+        </div>
+      `;
+      setTimeout(() => goToGate2(), 900);
+    }
+  } catch(e) {
+    document.getElementById('gate1Result').innerHTML =
+      `<div class="alert alert-error"><div class="alert-icon">✕</div>Server error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check →';
+  }
+}
+
+// ── GATE 2 ────────────────────────────────────────────────────────────────────
+async function goToGate2() {
+  setStep(2);
+  document.getElementById('gate2Word').textContent = targetWord;
+  gate2Done = false;
+  document.getElementById('gate2ContinueBtn').style.display = 'none';
+  document.getElementById('gate2OverrideBtn').style.display = 'none';
+  document.getElementById('gate2Result').innerHTML = '';
+
+  // Start webcam for gate2
+  const video  = document.getElementById('gate2Video');
+  const canvas = document.getElementById('gate2Canvas');
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:true});
+    video.srcObject = stream;
+    await video.play();
+  } catch(e) {
+    document.getElementById('gate2Result').innerHTML =
+      `<div class="alert alert-error"><div class="alert-icon">✕</div>Camera error: ${e.message}</div>`;
+    return;
+  }
+
+  gate2Hands = new Hands({locateFile: f =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`
+  });
+  gate2Hands.setOptions({maxNumHands:2,modelComplexity:1,
+    minDetectionConfidence:0.7,minTrackingConfidence:0.6});
+  gate2Hands.onResults(r => onGate2Results(r, canvas, video));
+
+  gate2Camera = new Camera(video, {
+    onFrame: async () => { if(gate2Hands) await gate2Hands.send({image:video}); },
+    width:640, height:480
+  });
+  await gate2Camera.start();
+}
+
+async function onGate2Results(results, canvas, video) {
+  if (gate2Done) return;
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if (!results.multiHandLandmarks?.length) return;
+
+  for (const lm of results.multiHandLandmarks) {
+    drawConnectors(ctx,lm,HAND_CONNECTIONS,{color:'#00d4aa55',lineWidth:2});
+    drawLandmarks(ctx,lm,{color:'#00d4aa',lineWidth:1,radius:3});
+  }
+
+  const features = buildFeatures(results);
+  if (!features) return;
+
+  gate2Done = true; // only check once
+  stopCamera(gate2Camera, gate2Hands, video);
+  gate2Camera = null; gate2Hands = null;
+
+  document.getElementById('gate2CamText').textContent = 'Gesture captured — analysing...';
+
+  try {
+    const res  = await fetch('/api/signs/gate2', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({landmarks: features})
+    });
+    const data = await res.json();
+    const div  = document.getElementById('gate2Result');
+
+    if (data.collision) {
+      div.innerHTML = `
+        <div class="alert alert-warn">
+          <div class="alert-icon">⚠</div>
+          <div>Your sign looks like <strong>${data.matched_word}</strong>
+               (${Math.round(data.confidence*100)}% match).
+               Try a different gesture, or override if you believe this is intentionally different.</div>
+        </div>`;
+      document.getElementById('gate2OverrideBtn').style.display = 'inline-block';
+    } else {
+      div.innerHTML = `
+        <div class="alert alert-success">
+          <div class="alert-icon">✓</div>
+          <div>Sign looks unique — no collision with existing vocabulary.</div>
+        </div>`;
+      document.getElementById('gate2ContinueBtn').style.display = 'inline-block';
+    }
+  } catch(e) {
+    document.getElementById('gate2Result').innerHTML =
+      `<div class="alert alert-error"><div class="alert-icon">✕</div>${e.message}</div>`;
+    document.getElementById('gate2ContinueBtn').style.display = 'inline-block';
+  }
+}
+
+// ── GATE 3: Recording ─────────────────────────────────────────────────────────
+async function proceedToRecord() {
+  setStep(3);
+  samples = [];
+  document.getElementById('recordWord').textContent     = targetWord;
+  document.getElementById('recordWordDesc').textContent = targetWord;
+  updateProgress(0);
+
+  const video  = document.getElementById('recordVideo');
+  const canvas = document.getElementById('recordCanvas');
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:true});
+    video.srcObject = stream;
+    await video.play();
+  } catch(e) { alert('Camera error: ' + e.message); return; }
+
+  recordHands = new Hands({locateFile: f =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`
+  });
+  recordHands.setOptions({maxNumHands:2,modelComplexity:1,
+    minDetectionConfidence:0.7,minTrackingConfidence:0.6});
+  recordHands.onResults(r => onRecordResults(r, canvas, video));
+
+  recordCamera = new Camera(video, {
+    onFrame: async () => { if(recordHands) await recordHands.send({image:video}); },
+    width:640, height:480
+  });
+  await recordCamera.start();
+}
+
+function onRecordResults(results, canvas, video) {
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if (!results.multiHandLandmarks?.length) {
+    document.getElementById('recordCamText').textContent = 'No hand detected — show your hand';
+    return;
+  }
+
+  for (const lm of results.multiHandLandmarks) {
+    drawConnectors(ctx,lm,HAND_CONNECTIONS,{color:'#00d4aa55',lineWidth:2});
+    drawLandmarks(ctx,lm,{color:'#00d4aa',lineWidth:1,radius:3});
+  }
+
+  const features = buildFeatures(results);
+  if (!features) return;
+
+  const now = Date.now();
+  if (now - lastSaveTime >= SAVE_DELAY && samples.length < TARGET) {
+    samples.push(features);
+    lastSaveTime = now;
+    updateProgress(samples.length);
+  }
+
+  const pct = Math.round(samples.length / TARGET * 100);
+  document.getElementById('recordCamText').textContent =
+    samples.length < FLOOR
+      ? `Collecting... ${samples.length}/${TARGET} (need ${FLOOR} minimum)`
+      : samples.length < TARGET
+      ? `Great! ${samples.length}/${TARGET} — keep going for best accuracy`
+      : `Done! ${samples.length} samples collected.`;
+}
+
+function updateProgress(n) {
+  const pct  = Math.min(100, Math.round(n/TARGET*100));
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('sampleCount').textContent  = `${n} / ${TARGET}`;
+  document.getElementById('progressFill').className   =
+    'progress-fill' + (n >= TARGET ? ' done' : n >= FLOOR ? '' : ' warn');
+  document.getElementById('submitBtn').disabled = n < FLOOR;
+}
+
+async function submitSign() {
+  if (samples.length < FLOOR) return;
+  stopCamera(recordCamera, recordHands, document.getElementById('recordVideo'));
+  recordCamera = null; recordHands = null;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Submitting...';
+
+  try {
+    const res  = await fetch('/api/signs/add', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({word: targetWord, samples})
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Server error');
+
+    setStep(4);
+    document.getElementById('successMsg').innerHTML =
+      `<strong>${targetWord}</strong> has been added with ${samples.length} samples. ${data.message}`;
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Submit Sign →';
+    alert('Error: ' + e.message);
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function buildFeatures(results) {
+  const r = new Array(63).fill(0);
+  const l = new Array(63).fill(0);
+  if (!results.multiHandLandmarks) return null;
+  for (let i=0; i<results.multiHandLandmarks.length; i++) {
+    const lm    = results.multiHandLandmarks[i];
+    const label = results.multiHandedness[i].classification[0].label;
+    const pts   = lm.map(p=>[p.x,p.y,p.z]);
+    const norm  = normalizePts(pts);
+    if (label==='Right') norm.forEach((v,j)=>r[j]=v);
+    else                 norm.forEach((v,j)=>l[j]=v);
+  }
+  return [...r,...l];
+}
+
+function normalizePts(pts) {
+  const w=pts[0];
+  const t=pts.map(p=>[p[0]-w[0],p[1]-w[1],p[2]-w[2]]);
+  const f=t.flat();
+  const s=Math.max(...f.map(Math.abs));
+  return s>0?f.map(v=>v/s):f;
+}
+
+function stopCamera(cam, hands, video) {
+  if (cam)    { try{cam.stop();}catch(e){} }
+  if (hands)  { try{hands.close();}catch(e){} }
+  if (video?.srcObject) video.srcObject.getTracks().forEach(t=>t.stop());
+}
+
+function setStep(n) {
+  ['gate1','gate2','gate3','gate4'].forEach((id,i) => {
+    document.getElementById(id).classList.toggle('active', i+1===n);
+    const ind = document.getElementById(`step${i+1}ind`);
+    ind.classList.toggle('active', i+1===n);
+    ind.classList.toggle('done', i+1<n);
+  });
+}
+
+function backToGate1() {
+  stopCamera(gate2Camera, gate2Hands, document.getElementById('gate2Video'));
+  stopCamera(recordCamera, recordHands, document.getElementById('recordVideo'));
+  gate2Camera=null; gate2Hands=null; recordCamera=null; recordHands=null;
+  setStep(1);
+}
+
+function resetAll() {
+  targetWord=''; samples=[];
+  document.getElementById('wordInput').value='';
+  document.getElementById('gate1Result').innerHTML='';
+  setStep(1);
+}
+</script>
+</body>
+</html>

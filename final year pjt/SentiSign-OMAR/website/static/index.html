@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentiSign — Sign Language Communication</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0a0e14;
+  --surface:  #111720;
+  --border:   #1e2d3d;
+  --teal:     #00d4aa;
+  --teal-dim: #00907a;
+  --amber:    #ffb347;
+  --red:      #ff5f5f;
+  --text:     #e8f0fe;
+  --muted:    #5a7a8a;
+  --radius:   12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  font-family:'DM Sans',sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── NAV ── */
+nav {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 40px;
+  border-bottom:1px solid var(--border);
+  background: rgba(10,14,20,0.95);
+  position:sticky; top:0; z-index:100;
+  backdrop-filter:blur(12px);
+}
+.nav-logo {
+  font-family:'Syne',sans-serif; font-weight:800; font-size:1.4rem;
+  color:var(--teal); letter-spacing:-0.5px;
+}
+.nav-logo span { color:var(--text); }
+.nav-links { display:flex; gap:32px; }
+.nav-links a {
+  color:var(--muted); text-decoration:none; font-size:0.9rem;
+  font-weight:500; transition:color 0.2s;
+}
+.nav-links a:hover, .nav-links a.active { color:var(--teal); }
+
+/* ── HERO ── */
+.hero {
+  padding:48px 40px 32px;
+  max-width:1200px; margin:0 auto;
+}
+.hero h1 {
+  font-family:'Syne',sans-serif; font-weight:800;
+  font-size:clamp(2rem,4vw,3.2rem);
+  line-height:1.1; margin-bottom:12px;
+}
+.hero h1 em { color:var(--teal); font-style:normal; }
+.hero p {
+  color:var(--muted); font-size:1rem; max-width:520px; line-height:1.6;
+}
+
+/* ── MAIN LAYOUT ── */
+.main-layout {
+  display:grid;
+  grid-template-columns:1fr 400px;
+  gap:24px;
+  max-width:1200px;
+  margin:0 auto;
+  padding:0 40px 40px;
+}
+
+/* ── WEBCAM CARD ── */
+.cam-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+  position:relative;
+}
+.cam-wrapper {
+  position:relative;
+  aspect-ratio:4/3;
+  background:#000;
+}
+#videoEl {
+  width:100%; height:100%;
+  object-fit:cover; display:block;
+  transform:scaleX(-1);
+}
+#overlayCanvas {
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  pointer-events:none;
+  transform:scaleX(-1);
+}
+.cam-status {
+  position:absolute; top:12px; left:12px;
+  background:rgba(0,0,0,0.7);
+  border:1px solid var(--border);
+  border-radius:8px; padding:6px 12px;
+  font-size:0.75rem; display:flex; align-items:center; gap:6px;
+}
+.status-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--muted);
+  transition:background 0.3s;
+}
+.status-dot.active { background:var(--teal); box-shadow:0 0 8px var(--teal); }
+.status-dot.detecting { background:var(--amber); box-shadow:0 0 8px var(--amber); }
+
+.emotion-badge {
+  position:absolute; top:12px; right:12px;
+  background:rgba(0,0,0,0.7);
+  border:1px solid var(--border);
+  border-radius:8px; padding:6px 14px;
+  font-size:0.8rem; font-weight:500;
+  text-transform:capitalize;
+  transition:all 0.4s;
+}
+
+/* ── WORD BUFFER ── */
+.word-buffer {
+  padding:16px 20px;
+  border-top:1px solid var(--border);
+  min-height:72px;
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+}
+.word-tag {
+  background:rgba(0,212,170,0.1);
+  border:1px solid rgba(0,212,170,0.3);
+  color:var(--teal);
+  padding:4px 12px; border-radius:20px;
+  font-size:0.85rem; font-weight:500;
+  animation:fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:scale(0.8)} to{opacity:1;transform:scale(1)} }
+.buffer-placeholder {
+  color:var(--muted); font-size:0.85rem; font-style:italic;
+}
+
+/* Sign confidence bar */
+.sign-info {
+  padding:10px 20px;
+  border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:12px;
+  font-size:0.8rem; color:var(--muted);
+}
+.conf-bar-wrap {
+  flex:1; height:4px; background:var(--border); border-radius:2px;
+}
+.conf-bar {
+  height:100%; background:var(--teal); border-radius:2px;
+  width:0; transition:width 0.2s;
+}
+.sign-label { min-width:140px; font-weight:500; color:var(--text); }
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  display:flex; flex-direction:column; gap:16px;
+}
+
+.panel-card {
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:20px;
+}
+.panel-card h3 {
+  font-family:'Syne',sans-serif; font-weight:700;
+  font-size:0.85rem; text-transform:uppercase; letter-spacing:1px;
+  color:var(--muted); margin-bottom:14px;
+}
+
+/* Controls */
+.btn-row { display:flex; gap:10px; flex-wrap:wrap; }
+.btn {
+  flex:1; padding:12px 16px;
+  border:none; border-radius:8px;
+  font-family:'DM Sans',sans-serif; font-weight:500; font-size:0.9rem;
+  cursor:pointer; transition:all 0.2s; min-width:100px;
+}
+.btn-primary {
+  background:var(--teal); color:#000;
+}
+.btn-primary:hover { background:#00f0c3; transform:translateY(-1px); }
+.btn-primary:disabled { background:var(--teal-dim); cursor:not-allowed; transform:none; opacity:0.6; }
+.btn-secondary {
+  background:transparent; color:var(--text);
+  border:1px solid var(--border);
+}
+.btn-secondary:hover { border-color:var(--teal); color:var(--teal); }
+.btn-danger {
+  background:transparent; color:var(--red);
+  border:1px solid rgba(255,95,95,0.3);
+}
+.btn-danger:hover { background:rgba(255,95,95,0.1); }
+
+.btn-icon { font-size:1rem; margin-right:4px; }
+
+/* Session toggle */
+#sessionBtn {
+  width:100%;
+  padding:14px;
+  font-size:1rem; font-weight:600;
+  border-radius:10px;
+  margin-bottom:4px;
+}
+
+/* Sentence output */
+#sentenceOutput {
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:8px; padding:14px;
+  font-size:1rem; line-height:1.6;
+  min-height:60px; color:var(--text);
+  font-style:italic;
+}
+#sentenceOutput.empty { color:var(--muted); font-style:italic; }
+
+/* Audio player */
+#audioSection {
+  display:none;
+  flex-direction:column; gap:10px;
+}
+#audioPlayer {
+  width:100%; border-radius:8px;
+  accent-color:var(--teal);
+}
+.download-link {
+  display:flex; align-items:center; gap:6px;
+  color:var(--teal); text-decoration:none; font-size:0.85rem;
+  padding:8px 12px;
+  border:1px solid rgba(0,212,170,0.2);
+  border-radius:8px;
+  transition:all 0.2s;
+  justify-content:center;
+}
+.download-link:hover { background:rgba(0,212,170,0.1); }
+
+/* Loading spinner */
+.spinner {
+  display:inline-block; width:14px; height:14px;
+  border:2px solid rgba(0,0,0,0.3);
+  border-top-color:#000;
+  border-radius:50%;
+  animation:spin 0.7s linear infinite;
+  vertical-align:middle; margin-right:6px;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* Emotion indicator strip */
+.emotion-strip {
+  display:flex; gap:6px; flex-wrap:wrap;
+}
+.emo-chip {
+  padding:4px 10px; border-radius:20px; font-size:0.75rem;
+  border:1px solid var(--border); color:var(--muted);
+  transition:all 0.3s;
+}
+.emo-chip.active {
+  border-color:var(--teal); color:var(--teal);
+  background:rgba(0,212,170,0.1);
+}
+
+/* Toast */
+.toast {
+  position:fixed; bottom:24px; right:24px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:12px 20px;
+  font-size:0.85rem; z-index:999;
+  transform:translateY(100px); opacity:0;
+  transition:all 0.3s;
+}
+.toast.show { transform:translateY(0); opacity:1; }
+.toast.success { border-color:var(--teal); }
+.toast.error   { border-color:var(--red); }
+
+/* Responsive */
+@media(max-width:900px){
+  .main-layout { grid-template-columns:1fr; }
+  nav { padding:14px 20px; }
+  .hero, .main-layout { padding-left:20px; padding-right:20px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Senti<span>Sign</span></div>
+  <div class="nav-links">
+    <a href="/" class="active">Communicate</a>
+    <a href="/signs">Signs</a>
+    <a href="/contribute">Contribute</a>
+    <a href="/about">About</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>Sign. Feel. <em>Speak.</em></h1>
+  <p>Sign ASL words at the camera. SentiSign reads your signs and emotion simultaneously, then speaks a natural sentence in your voice.</p>
+</div>
+
+<div class="main-layout">
+
+  <!-- LEFT: Webcam -->
+  <div class="cam-card">
+    <div class="cam-wrapper">
+      <video id="videoEl" autoplay muted playsinline></video>
+      <canvas id="overlayCanvas"></canvas>
+      <div class="cam-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Camera off</span>
+      </div>
+      <div class="emotion-badge" id="emotionBadge">—</div>
+    </div>
+
+    <div class="word-buffer" id="wordBuffer">
+      <span class="buffer-placeholder" id="bufferPlaceholder">Words will appear here as you sign...</span>
+    </div>
+
+    <div class="sign-info">
+      <span class="sign-label" id="signLabel">No sign detected</span>
+      <div class="conf-bar-wrap">
+        <div class="conf-bar" id="confBar"></div>
+      </div>
+      <span id="confText" style="min-width:38px; text-align:right;">0%</span>
+    </div>
+  </div>
+
+  <!-- RIGHT: Controls -->
+  <div class="right-panel">
+
+    <div class="panel-card">
+      <h3>Session</h3>
+      <button class="btn btn-primary" id="sessionBtn" onclick="toggleSession()">
+        ▶ Start Session
+      </button>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-secondary" onclick="removeLastWord()">← Undo</button>
+        <button class="btn btn-danger" onclick="clearWords()">✕ Clear</button>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h3>Emotion Detected</h3>
+      <div class="emotion-strip" id="emotionStrip">
+        <div class="emo-chip active" data-emo="neutral">neutral</div>
+        <div class="emo-chip" data-emo="happy">happy</div>
+        <div class="emo-chip" data-emo="sad">sad</div>
+        <div class="emo-chip" data-emo="angry">angry</div>
+        <div class="emo-chip" data-emo="fear">fear</div>
+        <div class="emo-chip" data-emo="disgust">disgust</div>
+        <div class="emo-chip" data-emo="surprise">surprise</div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h3>Output</h3>
+      <div id="sentenceOutput" class="empty">Sentence will appear here...</div>
+      <div id="audioSection">
+        <audio id="audioPlayer" controls></audio>
+        <a class="download-link" id="downloadLink" href="#" download>
+          ↓ Download .wav
+        </a>
+      </div>
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-primary" id="speakBtn" onclick="generateAndSpeak()" disabled>
+          ✦ Generate &amp; Speak
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MediaPipe Hands -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let sessionActive   = false;
+let wordBuffer      = [];
+let currentEmotion  = 'neutral';
+let emotionVotes    = {};
+let frameCount      = 0;
+let holdCounter     = 0;
+let currentClass    = '';
+let lastWord        = '';
+let lastKnownWord   = '';
+let lastKnownConf   = 0;
+let camera          = null;
+let handsDetector   = null;
+let lastAudioBlob   = null;
+let lastFilename    = '';
+
+const HOLD_FRAMES      = 10;
+const MIN_CONFIDENCE   = 0.60;
+const EMOTION_EVERY    = 5;
+const RECOGNISE_DELAY  = 80;   // ms between recognise API calls (~12fps max)
+let   lastRecogniseTime = 0;
+
+// ── UI refs ───────────────────────────────────────────────────────────────────
+const videoEl      = document.getElementById('videoEl');
+const canvas       = document.getElementById('overlayCanvas');
+const ctx          = canvas.getContext('2d');
+const statusDot    = document.getElementById('statusDot');
+const statusText   = document.getElementById('statusText');
+const emotionBadge = document.getElementById('emotionBadge');
+const wordBufferEl = document.getElementById('wordBuffer');
+const placeholder  = document.getElementById('bufferPlaceholder');
+const signLabel    = document.getElementById('signLabel');
+const confBar      = document.getElementById('confBar');
+const confText     = document.getElementById('confText');
+const speakBtn     = document.getElementById('speakBtn');
+const sessionBtn   = document.getElementById('sessionBtn');
+const sentenceEl   = document.getElementById('sentenceOutput');
+const audioSection = document.getElementById('audioSection');
+const audioPlayer  = document.getElementById('audioPlayer');
+const downloadLink = document.getElementById('downloadLink');
+
+// ── Session toggle ────────────────────────────────────────────────────────────
+async function toggleSession() {
+  if (!sessionActive) {
+    await startSession();
+  } else {
+    stopSession();
+  }
+}
+
+async function startSession() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+    videoEl.srcObject = stream;
+    await videoEl.play();
+
+    handsDetector = new Hands({locateFile: f =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}`
+    });
+    handsDetector.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.6,
+    });
+    handsDetector.onResults(onHandResults);
+
+    camera = new Camera(videoEl, {
+      onFrame: async () => {
+        if (handsDetector) await handsDetector.send({image: videoEl});
+      },
+      width: 640, height: 480,
+    });
+    await camera.start();
+
+    sessionActive = true;
+    sessionBtn.textContent = '■ Stop Session';
+    sessionBtn.style.background = 'rgba(255,95,95,0.2)';
+    sessionBtn.style.color = '#ff5f5f';
+    sessionBtn.style.border = '1px solid rgba(255,95,95,0.4)';
+    statusDot.classList.add('active');
+    statusText.textContent = 'Session active';
+
+    // Start face/emotion loop
+    startEmotionLoop();
+  } catch(e) {
+    showToast('Camera access denied: ' + e.message, 'error');
+  }
+}
+
+function stopSession() {
+  if (camera) { camera.stop(); camera = null; }
+  if (handsDetector) { handsDetector.close(); handsDetector = null; }
+  const stream = videoEl.srcObject;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  videoEl.srcObject = null;
+  sessionActive = false;
+  sessionBtn.textContent = '▶ Start Session';
+  sessionBtn.style.cssText = '';
+  statusDot.classList.remove('active','detecting');
+  statusText.textContent = 'Camera off';
+  emotionBadge.textContent = '—';
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+}
+
+// ── Hand results ──────────────────────────────────────────────────────────────
+async function onHandResults(results) {
+  console.log('onHandResults called, hands:', results.multiHandLandmarks?.length ?? 0);
+  canvas.width  = videoEl.videoWidth  || 640;
+  canvas.height = videoEl.videoHeight || 480;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    holdCounter  = 0;
+    currentClass = '';
+    lastWord     = '';
+    signLabel.textContent = 'No sign detected';
+    confBar.style.width   = '0%';
+    confText.textContent  = '0%';
+    statusDot.classList.remove('detecting');
+    return;
+  }
+
+  statusDot.classList.add('detecting');
+
+  // ?? Always draw landmarks every frame regardless of throttle ??
+  for (const lm of results.multiHandLandmarks) {
+    drawConnectors(ctx, lm, HAND_CONNECTIONS, {color:'#00d4aa55', lineWidth:2});
+    drawLandmarks(ctx, lm, {color:'#00d4aa', lineWidth:1, radius:3});
+  }
+
+  for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+    const lm    = results.multiHandLandmarks[i];
+    const hand  = results.multiHandedness?.[i];
+    const label = hand?.classification?.[0]?.label ?? 'Right';
+    const color = label === 'Right' ? '#00d4aa' : '#ff9a3c';
+    const xs = lm.map(p => p.x * canvas.width);
+    const ys = lm.map(p => p.y * canvas.height);
+    const x1 = Math.max(0, Math.min(...xs) - 20);
+    const y1 = Math.max(0, Math.min(...ys) - 20);
+    const x2 = Math.min(canvas.width,  Math.max(...xs) + 20);
+    const y2 = Math.min(canvas.height, Math.max(...ys) + 20);
+    ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+    ctx.fillStyle = color; ctx.font = '13px DM Sans';
+    ctx.fillText(label === 'Right' ? 'R' : 'L', x1+4, y1-4);
+  }
+
+  // ?? Build features ?????????????????????????????????????????????
+  const features = buildFeatures(results);
+  if (!features) return;
+
+  // ?? Throttle only the API call ? hold counter runs every frame ??
+  const now = Date.now();
+  if (now - lastRecogniseTime < RECOGNISE_DELAY) {
+    // Only increment hold counter if last confidence was above threshold
+    if (currentClass && currentClass !== 'NOTHING' && lastKnownConf >= MIN_CONFIDENCE) {
+      holdCounter++;
+      const word = lastKnownWord;
+      if (holdCounter >= HOLD_FRAMES && word && word !== lastWord) {
+        addWord(word);
+        lastWord    = word;
+        holdCounter = 0;
+      }
+    }
+    return;
+  }
+  lastRecogniseTime = now;
+
+  // ?? API call ????????????????????????????????????????????????????
+  try {
+    const res  = await fetch('/api/recognise', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({landmarks: features})
+    });
+    const data = await res.json();
+    const cls  = data.class;
+    const word = data.word;
+    const conf = data.confidence;
+
+    signLabel.textContent = word ? `${cls} ? ${word}` : (cls || 'NOTHING');
+    confBar.style.width   = `${Math.round(conf*100)}%`;
+    confText.textContent  = `${Math.round(conf*100)}%`;
+
+    // Update class tracking
+    if (cls !== currentClass) {
+      lastWord     = '';   // reset on class change
+      currentClass = cls;
+      holdCounter  = 0;
+    } else if (conf >= MIN_CONFIDENCE) {
+      holdCounter++;
+    }
+
+    lastKnownWord  = word;
+    lastKnownConf  = conf;
+
+    if (holdCounter >= HOLD_FRAMES && word && word !== lastWord) {
+      addWord(word);
+      lastWord    = word;
+      holdCounter = 0;
+    }
+
+  } catch(e) {
+    console.error('Recognise error:', e);
+  }
+}
+
+function buildFeatures(results) {
+  const right = new Array(63).fill(0);
+  const left  = new Array(63).fill(0);
+  if (!results.multiHandLandmarks) return null;
+  for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+    const lm    = results.multiHandLandmarks[i];
+    const label = results.multiHandedness?.[i]?.classification?.[0]?.label ?? 'Left';
+    const flat  = lm.flatMap(p => [p.x, p.y, p.z]);
+    // Both Python and JS label physical right hand as 'Left' — direct mapping
+    if (label === 'Right') flat.forEach((v,j) => right[j] = v);
+    else                   flat.forEach((v,j) => left[j]  = v);
+  }
+  return [...right, ...left];
+}
+
+// ── Emotion loop ──────────────────────────────────────────────────────────────
+let emotionInterval = null;
+function startEmotionLoop() {
+  emotionInterval = setInterval(async () => {
+    if (!sessionActive || !videoEl.videoWidth) return;
+    try {
+      // Mirror the frame to match display orientation
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width  = videoEl.videoWidth;
+      tmpCanvas.height = videoEl.videoHeight;
+      const tmpCtx = tmpCanvas.getContext('2d');
+      tmpCtx.translate(tmpCanvas.width, 0);
+      tmpCtx.scale(-1, 1);
+      tmpCtx.drawImage(videoEl, 0, 0);
+      const base64 = tmpCanvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+      const res    = await fetch('/api/emotion', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({image: base64})
+      });
+      const data = await res.json();
+      if (data.emotion) {
+        emotionVotes[data.emotion] = (emotionVotes[data.emotion]||0) + 1;
+        // Find majority
+        const top = Object.entries(emotionVotes)
+          .sort((a,b) => b[1]-a[1])[0][0];
+        currentEmotion = top;
+        updateEmotionUI(top);
+      }
+    } catch(e) { /* silent */ }
+  }, 500); // every 500ms
+}
+
+function updateEmotionUI(emotion) {
+  emotionBadge.textContent = emotion;
+  emotionBadge.style.borderColor = emotionColor(emotion);
+  emotionBadge.style.color = emotionColor(emotion);
+  document.querySelectorAll('.emo-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.emo === emotion);
+  });
+}
+
+function emotionColor(e) {
+  return {
+    happy:'#ffd700', sad:'#6aa3d5', angry:'#ff5f5f',
+    fear:'#c084fc', disgust:'#86efac', surprise:'#ff9a3c', neutral:'#00d4aa'
+  }[e] || '#00d4aa';
+}
+
+// ── Word management ───────────────────────────────────────────────────────────
+function addWord(word) {
+  wordBuffer.push(word);
+  renderBuffer();
+  speakBtn.disabled = false;
+  showToast(`+ ${word}`, 'success');
+}
+
+function removeLastWord() {
+  if (wordBuffer.length > 0) {
+    wordBuffer.pop();
+    renderBuffer();
+    if (wordBuffer.length === 0) speakBtn.disabled = true;
+  }
+}
+
+function clearWords() {
+  wordBuffer   = [];
+  emotionVotes = {};
+  currentEmotion = 'neutral';
+  lastWord     = '';
+  holdCounter  = 0;
+  renderBuffer();
+  updateEmotionUI('neutral');
+  speakBtn.disabled = true;
+  sentenceEl.textContent = 'Sentence will appear here...';
+  sentenceEl.classList.add('empty');
+  audioSection.style.display = 'none';
+}
+
+function renderBuffer() {
+  placeholder.style.display = wordBuffer.length ? 'none' : 'inline';
+  // Remove old tags
+  wordBufferEl.querySelectorAll('.word-tag').forEach(t => t.remove());
+  wordBuffer.forEach(w => {
+    const tag = document.createElement('span');
+    tag.className = 'word-tag';
+    tag.textContent = w;
+    wordBufferEl.appendChild(tag);
+  });
+}
+
+// ── Generate & Speak ──────────────────────────────────────────────────────────
+async function generateAndSpeak() {
+  if (wordBuffer.length === 0) return;
+  speakBtn.disabled = true;
+  speakBtn.innerHTML = '<span class="spinner"></span>Generating...';
+
+  try {
+    const res = await fetch('/api/generate_and_speak', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({words: wordBuffer, emotion: currentEmotion})
+    });
+
+    if (!res.ok) throw new Error(await res.text());
+
+    const sentence = res.headers.get('X-Sentence') || '';
+    lastFilename   = res.headers.get('X-Filename')  || 'sentisign.wav';
+
+    const blob = await res.blob();
+    lastAudioBlob = blob;
+    const url  = URL.createObjectURL(blob);
+
+    sentenceEl.textContent = `"${sentence}"`;
+    sentenceEl.classList.remove('empty');
+
+    audioPlayer.src = url;
+    audioPlayer.play();
+
+    downloadLink.href     = url;
+    downloadLink.download = lastFilename;
+    downloadLink.textContent = `↓ Download ${lastFilename}`;
+
+    audioSection.style.display = 'flex';
+    showToast('Speech generated!', 'success');
+
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  } finally {
+    speakBtn.disabled = false;
+    speakBtn.innerHTML = '✦ Generate &amp; Speak';
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── Canvas resize ─────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  if (videoEl.videoWidth) {
+    canvas.width  = videoEl.videoWidth;
+    canvas.height = videoEl.videoHeight;
+  }
+});
+</script>
+</body>
+</html>
