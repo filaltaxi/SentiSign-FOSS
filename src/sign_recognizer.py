@@ -61,6 +61,15 @@ FLUSH_SECONDS   = 30.0    # seconds of no new word → auto end
 EMOTION_EVERY_N = 5       # run emotion on every Nth frame to save CPU
 DEFAULT_EMOTION = 'neutral'
 
+# MediaPipe Hands tuning
+# For two-hand models, `static_image_mode=True` tends to detect a newly introduced
+# second hand more reliably than tracking mode.
+HANDS_DETECT_CONF_SINGLE = 0.70
+HANDS_TRACK_CONF_SINGLE = 0.60
+HANDS_DETECT_CONF_MULTI = 0.50
+HANDS_TRACK_CONF_MULTI = 0.50
+HANDS_MODEL_COMPLEXITY = 1
+
 # Sign commit thresholds (fast path + slow path for low-confidence but stable signs)
 SIGN_HIGH_CONFIDENCE = 0.60
 SIGN_LOW_CONFIDENCE = 0.30
@@ -71,7 +80,8 @@ SIGN_LOW_HOLD_FRAMES = 26
 EMO_CONFIDENCE_THRESHOLD = 0.40
 EMO_PROBS_EMA_ALPHA = 0.60
 EMO_RECENT_WINDOW_SIZE = 28
-FACE_BOX_EMA_ALPHA = 0.25
+FACE_DETECT_EVERY_N = 1
+FACE_BOX_EMA_ALPHA = 0.45
 FACE_BOX_HOLD_FRAMES = 10
 FACE_BOX_IOU_HINT_THRESHOLD = 0.15
 FACE_ROI_PADDING_RATIO = 0.10
@@ -430,6 +440,63 @@ def _extract_landmark_features(results, expected_dim: int):
     return np.concatenate([base, pad])
 
 
+def _pad_or_truncate(vec: np.ndarray, expected_dim: int) -> np.ndarray:
+    if vec.shape[0] == expected_dim:
+        return vec
+    if vec.shape[0] > expected_dim:
+        return vec[:expected_dim]
+    pad = np.zeros(expected_dim - vec.shape[0], dtype=np.float32)
+    return np.concatenate([vec, pad])
+
+
+def _extract_landmark_feature_candidates(results, expected_dim: int):
+    """
+    Build one or more candidate feature vectors for sign classification.
+
+    For two-hand models, MediaPipe handedness can be unreliable; we instead:
+    - order hands by wrist x position (leftmost/rightmost in image)
+    - try both slot assignments (A,B) and (B,A)
+    - let the model confidence choose
+    """
+    if not results or not getattr(results, 'multi_hand_landmarks', None):
+        return None
+
+    hands = results.multi_hand_landmarks
+    if expected_dim <= 63:
+        feats = _normalize_landmarks(hands[0].landmark)
+        return [_pad_or_truncate(feats, expected_dim)]
+
+    zeros = np.zeros(63, dtype=np.float32)
+
+    # One hand: try placing it in either slot.
+    if len(hands) == 1:
+        f0 = _normalize_landmarks(hands[0].landmark)
+        a = _pad_or_truncate(np.concatenate([f0, zeros]), expected_dim)
+        b = _pad_or_truncate(np.concatenate([zeros, f0]), expected_dim)
+        return [a, b]
+
+    # Two+ hands: choose the two extreme wrists in x, then try both assignments.
+    wrists_x = []
+    for h in hands:
+        try:
+            wrists_x.append(float(h.landmark[0].x))
+        except Exception:
+            wrists_x.append(0.0)
+
+    idx_left = int(np.argmin(wrists_x))
+    idx_right = int(np.argmax(wrists_x))
+    if idx_left == idx_right:
+        idx_left = 0
+        idx_right = 1 if len(hands) > 1 else 0
+
+    f_left = _normalize_landmarks(hands[idx_left].landmark)
+    f_right = _normalize_landmarks(hands[idx_right].landmark)
+
+    a = _pad_or_truncate(np.concatenate([f_left, f_right]), expected_dim)
+    b = _pad_or_truncate(np.concatenate([f_right, f_left]), expected_dim)
+    return [a, b]
+
+
 def _classify_emotion(emo_model, frame, device, face_box, clahe):
     """Run ResNet emotion classifier on a provided face box. Returns probs or None."""
     if emo_model is None or face_box is None:
@@ -496,10 +563,18 @@ def capture_words_and_emotion() -> tuple:
             import mediapipe as mp
             _hands_module = mp.solutions.hands
             _drawing      = mp.solutions.drawing_utils
+            use_two_hands = expected_dim > 63
             hands = _hands_module.Hands(
-                static_image_mode=False,
-                max_num_hands=2 if expected_dim > 63 else 1,
-                min_detection_confidence=0.7, min_tracking_confidence=0.6,
+                static_image_mode=True if use_two_hands else False,
+                max_num_hands=2 if use_two_hands else 1,
+                model_complexity=HANDS_MODEL_COMPLEXITY,
+                min_detection_confidence=HANDS_DETECT_CONF_MULTI if use_two_hands else HANDS_DETECT_CONF_SINGLE,
+                min_tracking_confidence=HANDS_TRACK_CONF_MULTI if use_two_hands else HANDS_TRACK_CONF_SINGLE,
+            )
+            print(
+                f'[sign_recognizer] Hands: expected_dim={expected_dim} '
+                f'max_num_hands={2 if use_two_hands else 1} '
+                f'static_image_mode={"on" if use_two_hands else "off"}'
             )
         except ImportError:
             print('  Warning: mediapipe not installed; sign recognition disabled.')
@@ -554,6 +629,7 @@ def capture_words_and_emotion() -> tuple:
             if hands is not None and _hands_module is not None and _drawing is not None:
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 results   = hands.process(frame_rgb)
+                hands_n = len(results.multi_hand_landmarks) if results.multi_hand_landmarks else 0
 
                 if results.multi_hand_landmarks:
                     for hand_lm in results.multi_hand_landmarks:
@@ -561,9 +637,16 @@ def capture_words_and_emotion() -> tuple:
                             frame, hand_lm, _hands_module.HAND_CONNECTIONS)
 
                     feats = _extract_landmark_features(results, expected_dim)
-                    if feats is not None:
-                        cls_name, confidence, margin = _classify_landmarks(
-                            mlp_model, idx_to_label, feats, device)
+                    candidates = _extract_landmark_feature_candidates(results, expected_dim)
+                    if candidates:
+                        best = None
+                        for cand in candidates:
+                            c, conf, m = _classify_landmarks(
+                                mlp_model, idx_to_label, cand, device)
+                            if best is None or conf > best[1]:
+                                best = (c, conf, m)
+                        if best is not None:
+                            cls_name, confidence, margin = best
 
                     # Hold logic
                     if cls_name != current_cls:
@@ -595,32 +678,41 @@ def capture_words_and_emotion() -> tuple:
                             mode = 'HIGH' if confidence >= SIGN_HIGH_CONFIDENCE else 'LOW'
                             print(f'  + ({mode}) [{cls_name}] -> {word:<14}  Words: {word_buffer}')
 
-            # ── EMOTION RECOGNITION (every Nth frame) ─────────────────────
-            if frame_count % EMOTION_EVERY_N == 0:
+            # ── FACE TRACKING (fast) ──────────────────────────────────────
+            # Update the face box frequently so it follows head movement quickly.
+            if (
+                emo_model is not None
+                and face_cascade is not None
+                and frame_count % FACE_DETECT_EVERY_N == 0
+            ):
                 detected_box = None
-                if emo_model is not None and face_cascade is not None:
-                    try:
-                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                        faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
-                        boxes = _filter_face_boxes(
-                            frame.shape,
-                            [tuple(map(int, f)) for f in faces],
-                        )
-                        detected_box = _select_face_box(boxes, tracked_face_box)
-                    except Exception:
-                        detected_box = None
+                try:
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    faces = face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(60, 60))
+                    boxes = _filter_face_boxes(
+                        frame.shape,
+                        [tuple(map(int, f)) for f in faces],
+                    )
+                    detected_box = _select_face_box(boxes, tracked_face_box)
+                except Exception:
+                    detected_box = None
 
                 if detected_box is not None:
-                    tracked_face_box = (
-                        detected_box if tracked_face_box is None
-                        else _smooth_box(tracked_face_box, detected_box, FACE_BOX_EMA_ALPHA)
-                    )
+                    if tracked_face_box is None:
+                        tracked_face_box = detected_box
+                    else:
+                        # Catch up faster on larger movements (low IoU).
+                        iou = _box_iou(tracked_face_box, detected_box)
+                        alpha = FACE_BOX_EMA_ALPHA if iou >= 0.25 else min(0.75, FACE_BOX_EMA_ALPHA * 2.0)
+                        tracked_face_box = _smooth_box(tracked_face_box, detected_box, alpha)
                     face_hold = FACE_BOX_HOLD_FRAMES
                 elif face_hold > 0:
                     face_hold -= 1
                 else:
                     tracked_face_box = None
 
+            # ── EMOTION RECOGNITION (slower cadence) ──────────────────────
+            if frame_count % EMOTION_EVERY_N == 0:
                 probs = _classify_emotion(emo_model, frame, device, tracked_face_box, clahe)
                 if probs is not None:
                     if smoothed_probs is None:
@@ -673,6 +765,9 @@ def capture_words_and_emotion() -> tuple:
                 cv2.putText(frame,
                     f'Sign: {cls_name} ({confidence:.0%}) -> {word_disp}',
                     (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
+                cv2.putText(frame,
+                    f'Hands: {hands_n}',
+                    (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 255, 0), 1)
 
                 # Hold progress bar
                 high_p = min(hold_counter_high / max(1, HOLD_FRAMES), 1.0)
