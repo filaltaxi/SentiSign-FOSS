@@ -15,7 +15,7 @@ export const Communicate: React.FC = () => {
     const [sentence, setSentence] = useState<string>('');
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
     const [audioFilename, setAudioFilename] = useState<string | null>(null);
-    const [isGenerating, setIsGenerating] = useState<boolean>(false);
+    const [generationStage, setGenerationStage] = useState<'idle' | 'sentence' | 'audio'>('idle');
     const [sessionActive, setSessionActive] = useState<boolean>(false);
     const [detectedEmotion, setDetectedEmotion] = useState<EmotionType>('neutral');
     const [emotionOverride, setEmotionOverride] = useState<EmotionType | null>(null);
@@ -23,12 +23,28 @@ export const Communicate: React.FC = () => {
     const [confidence, setConfidence] = useState<number>(0);
     const selectedEmotion = emotionOverride ?? detectedEmotion;
     const canGenerate = wordBuffer.length > 0;
+    const isGenerating = generationStage !== 'idle';
 
     const trackingRef = useRef<{ holdCounter: number; currentClass: string | null; lastWord: string }>({
         holdCounter: 0,
         currentClass: null,
         lastWord: '',
     });
+
+    const generationAbortRef = useRef<AbortController | null>(null);
+    const generationRunIdRef = useRef<number>(0);
+
+    const cancelGeneration = useCallback(() => {
+        generationAbortRef.current?.abort();
+        generationAbortRef.current = null;
+        setGenerationStage('idle');
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            generationAbortRef.current?.abort();
+        };
+    }, []);
 
     const handleSignDetected = useCallback(
         (word: string | null, cls: string | null, conf: number) => {
@@ -83,6 +99,7 @@ export const Communicate: React.FC = () => {
     };
 
     const clearWords = () => {
+        cancelGeneration();
         setWordBuffer([]);
         setSentence('');
         setAudioUrl(null);
@@ -101,21 +118,39 @@ export const Communicate: React.FC = () => {
             trackingRef.current.holdCounter = 0;
             trackingRef.current.currentClass = null;
         }
-        setIsGenerating(true);
+
+        generationAbortRef.current?.abort();
+        const abortController = new AbortController();
+        generationAbortRef.current = abortController;
+
+        generationRunIdRef.current += 1;
+        const runId = generationRunIdRef.current;
+
+        setGenerationStage('sentence');
         try {
-            const data = await generateSentence(wordBuffer, selectedEmotion);
+            const data = await generateSentence(wordBuffer, selectedEmotion, { signal: abortController.signal });
+            if (generationRunIdRef.current !== runId) return;
+
             if (data.sentence) {
                 setSentence(data.sentence);
-                const audioData = await generateAudio(data.sentence, selectedEmotion);
+                setGenerationStage('audio');
+                const audioData = await generateAudio(data.sentence, selectedEmotion, { signal: abortController.signal });
+                if (generationRunIdRef.current !== runId) return;
+
                 if (audioData.audio_url) {
                     setAudioUrl(`${audioData.audio_url}?t=${Date.now()}`);
                     setAudioFilename(audioData.audio_file);
                 }
             }
         } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            if (error instanceof Error && error.name === 'AbortError') return;
             console.error('Generation error:', error);
         } finally {
-            setIsGenerating(false);
+            if (generationRunIdRef.current === runId) {
+                generationAbortRef.current = null;
+                setGenerationStage('idle');
+            }
         }
     };
 
@@ -199,14 +234,20 @@ export const Communicate: React.FC = () => {
                         </div>
 
                         <button
-                            onClick={handleGenerateAndSpeak}
-                            disabled={!canGenerate || isGenerating}
-                            className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-transparent bg-gradient-to-r from-brand to-brand-end text-[0.86rem] font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_14px_24px_rgba(0,127,255,0.28)] disabled:cursor-not-allowed disabled:opacity-45 disabled:saturate-50 disabled:transform-none disabled:shadow-none"
+                            onClick={isGenerating ? cancelGeneration : handleGenerateAndSpeak}
+                            disabled={!isGenerating && !canGenerate}
+                            className={`mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-transparent text-[0.86rem] font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45 disabled:saturate-50 disabled:transform-none disabled:shadow-none ${isGenerating
+                                ? 'bg-gradient-to-r from-[#ff3b30] to-[#ff7a59] hover:shadow-[0_14px_24px_rgba(255,59,48,0.22)]'
+                                : 'bg-gradient-to-r from-brand to-brand-end hover:shadow-[0_14px_24px_rgba(0,127,255,0.28)]'
+                                }`}
                         >
                             {isGenerating ? (
                                 <>
                                     <span className="inline-block h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white animate-[spin_0.7s_linear_infinite]" />
-                                    Synthesizing
+                                    Cancel
+                                    <span className="ml-1 rounded-full bg-white/15 px-2 py-0.5 text-[0.64rem] font-extrabold uppercase tracking-[0.14em] text-white/90">
+                                        {generationStage === 'sentence' ? 'SENTENCE' : 'AUDIO'}
+                                    </span>
                                 </>
                             ) : (
                                 <>&#10022; Generate &amp; Speak</>

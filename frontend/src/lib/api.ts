@@ -19,7 +19,34 @@ const POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
 let latestJob: GenerateAndSpeakResponse | null = null;
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+type RequestOptions = {
+    signal?: AbortSignal;
+};
+
+const sleep = (ms: number, signal?: AbortSignal) =>
+    new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(new DOMException('Aborted', 'AbortError'));
+            return;
+        }
+
+        const timeout = window.setTimeout(() => {
+            cleanup();
+            resolve();
+        }, ms);
+
+        const onAbort = () => {
+            cleanup();
+            reject(new DOMException('Aborted', 'AbortError'));
+        };
+
+        const cleanup = () => {
+            window.clearTimeout(timeout);
+            signal?.removeEventListener('abort', onAbort);
+        };
+
+        signal?.addEventListener('abort', onAbort, { once: true });
+    });
 
 const normalizeEmotion = (emotion: string) => emotion.trim().toLowerCase();
 
@@ -32,7 +59,7 @@ const readErrorMessage = async (res: Response): Promise<string> => {
     }
 };
 
-export const generateSentence = async (words: string[], emotion: string) => {
+export const generateSentence = async (words: string[], emotion: string, options?: RequestOptions) => {
     if (words.length === 0) {
         throw new Error('No words provided');
     }
@@ -41,6 +68,7 @@ export const generateSentence = async (words: string[], emotion: string) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ words, emotion: normalizeEmotion(emotion) }),
+        signal: options?.signal,
     });
 
     if (!response.ok) {
@@ -57,7 +85,7 @@ export const generateSentence = async (words: string[], emotion: string) => {
     return { sentence: data.sentence };
 };
 
-export const generateAudio = async (sentence: string, emotion: string) => {
+export const generateAudio = async (sentence: string, emotion: string, options?: RequestOptions) => {
     const normalizedEmotion = normalizeEmotion(emotion);
 
     if (!latestJob) {
@@ -74,7 +102,7 @@ export const generateAudio = async (sentence: string, emotion: string) => {
     const deadline = Date.now() + POLL_TIMEOUT_MS;
 
     while (Date.now() < deadline) {
-        const statusResponse = await fetch(latestJob.status_url);
+        const statusResponse = await fetch(latestJob.status_url, { signal: options?.signal });
 
         if (!statusResponse.ok) {
             throw new Error(`TTS status check failed: ${await readErrorMessage(statusResponse)}`);
@@ -90,7 +118,7 @@ export const generateAudio = async (sentence: string, emotion: string) => {
             throw new Error(status.error || 'TTS generation failed');
         }
 
-        await sleep(POLL_INTERVAL_MS);
+        await sleep(POLL_INTERVAL_MS, options?.signal);
     }
 
     throw new Error('Timed out waiting for generated audio');

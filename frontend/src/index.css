@@ -42,6 +42,19 @@
   #root {
     @apply min-h-screen;
   }
+
+  audio.sentisign-audio {
+    background-color: #0b1220;
+  }
+
+  audio.sentisign-audio::-webkit-media-controls-enclosure {
+    background-color: #0b1220;
+    border-radius: 0.75rem;
+  }
+
+  audio.sentisign-audio::-webkit-media-controls-panel {
+    background-color: #0b1220;
+  }
 }
 
 @layer utilities {

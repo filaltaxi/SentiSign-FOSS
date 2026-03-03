@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Square } from 'lucide-react';
 
 interface SentenceOutputProps {
     sentence: string | null;
@@ -15,14 +16,15 @@ export function SentenceOutput({
 }: SentenceOutputProps) {
     const [typedSentence, setTypedSentence] = useState<string>('');
     const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
         if (!sentence) {
-            setTypedSentence('');
+            Promise.resolve().then(() => setTypedSentence(''));
             return;
         }
 
-        setTypedSentence('');
+        Promise.resolve().then(() => setTypedSentence(''));
         let charIndex = 0;
         const typeInterval = setInterval(() => {
             charIndex += 1;
@@ -37,8 +39,21 @@ export function SentenceOutput({
     }, [sentence]);
 
     useEffect(() => {
-        setIsSpeaking(false);
+        const audioEl = audioRef.current;
+        if (audioEl) {
+            audioEl.pause();
+            audioEl.currentTime = 0;
+        }
+        Promise.resolve().then(() => setIsSpeaking(false));
     }, [audioUrl]);
+
+    const stopAudio = () => {
+        const audioEl = audioRef.current;
+        if (!audioEl) return;
+        audioEl.pause();
+        audioEl.currentTime = 0;
+        setIsSpeaking(false);
+    };
 
     return (
         <div className="flex flex-col gap-3">
@@ -74,22 +89,32 @@ export function SentenceOutput({
                         </div>
                     )}
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <audio
-                            src={audioUrl}
-                            controls
-                            autoPlay
-                            onPlay={() => setIsSpeaking(true)}
-                            onPause={() => setIsSpeaking(false)}
-                            onEnded={() => setIsSpeaking(false)}
-                            className="h-11 w-full rounded-xl border border-border-color bg-white accent-brand shadow-[0_8px_16px_rgba(15,34,68,0.08)] sm:flex-1"
-                        />
-                        <a
-                            href={audioUrl}
-                            download={audioFilename || 'sentisign.wav'}
-                            className="flex min-w-[120px] items-center justify-center gap-2 rounded-xl border border-[#c8ddff] bg-white px-4 py-2.5 text-[0.8rem] font-bold text-brand no-underline transition-all duration-300 hover:bg-[#f4f9ff] hover:shadow-[0_10px_20px_rgba(0,127,255,0.12)]"
-                        >
-                            Download
-                        </a>
+	                        <audio
+	                            src={audioUrl}
+	                            controls
+	                            autoPlay
+	                            ref={audioRef}
+	                            onPlay={() => setIsSpeaking(true)}
+	                            onPause={() => setIsSpeaking(false)}
+	                            onEnded={() => setIsSpeaking(false)}
+	                            className="sentisign-audio h-11 w-full overflow-hidden rounded-xl border border-border-color bg-[#0b1220] accent-brand shadow-[0_8px_16px_rgba(15,34,68,0.08)] sm:flex-1"
+	                        />
+                        <div className="flex gap-2 sm:flex-none">
+                            <button
+                                type="button"
+                                onClick={stopAudio}
+                                className="flex min-w-[104px] items-center justify-center gap-2 rounded-xl border border-[#ffd0cd] bg-white px-4 py-2.5 text-[0.8rem] font-bold text-[#cc2d2d] transition-all duration-300 hover:bg-[#fff2f2] hover:shadow-[0_10px_20px_rgba(255,59,48,0.14)]"
+                            >
+                                <Square size={14} fill="currentColor" /> Stop
+                            </button>
+                            <a
+                                href={audioUrl}
+                                download={audioFilename || 'sentisign.wav'}
+                                className="flex min-w-[120px] items-center justify-center gap-2 rounded-xl border border-[#c8ddff] bg-white px-4 py-2.5 text-[0.8rem] font-bold text-brand no-underline transition-all duration-300 hover:bg-[#f4f9ff] hover:shadow-[0_10px_20px_rgba(0,127,255,0.12)]"
+                            >
+                                Download
+                            </a>
+                        </div>
                     </div>
                 </div>
             )}
