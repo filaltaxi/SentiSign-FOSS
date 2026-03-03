@@ -6,25 +6,31 @@ export type EmotionType = typeof EMOTIONS[number];
 
 interface EmotionStripProps {
     currentEmotion: EmotionType;
+    onSelectEmotion?: (emotion: EmotionType) => void;
 }
 
-export function EmotionStrip({ currentEmotion }: EmotionStripProps) {
+export function EmotionStrip({ currentEmotion, onSelectEmotion }: EmotionStripProps) {
+    const isInteractive = typeof onSelectEmotion === 'function';
+
     return (
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex flex-wrap gap-1.5">
             {EMOTIONS.map((emo) => (
-                <div
+                <button
                     key={emo}
+                    type="button"
+                    onClick={() => onSelectEmotion?.(emo)}
                     className={twMerge(
                         clsx(
-                            "px-2.5 py-1 rounded-full text-[0.75rem] border transition-all duration-300",
+                            "rounded-full px-3.5 py-1.5 text-[0.72rem] font-bold uppercase tracking-[0.14em] shadow-sm transition-all duration-300",
+                            isInteractive && "cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_10px_16px_rgba(15,34,68,0.14)]",
                             emo === currentEmotion
-                                ? "border-brand text-brand bg-[rgba(0,212,170,0.1)]"
-                                : "border-border-color text-muted"
+                                ? "scale-[1.06] border border-[#99c8ff] bg-gradient-to-r from-[rgba(51,153,255,0.18)] to-[rgba(0,127,255,0.18)] text-brand shadow-[0_8px_20px_rgba(0,127,255,0.25)]"
+                                : "border border-border-color bg-white text-muted"
                         )
                     )}
                 >
                     {emo}
-                </div>
+                </button>
             ))}
         </div>
     );

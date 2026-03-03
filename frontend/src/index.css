@@ -1,41 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@500;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --font-heading: "Syne", ui-sans-serif, system-ui, sans-serif;
-  
-  --color-bg: #0a0e14;
-  --color-surface: #111720;
-  --color-border-color: #1e2d3d;
-  --color-brand: #00d4aa;
-  --color-brand-dim: #00907a;
-  --color-amber: #ffb347;
-  --color-red: #ff5f5f;
-  --color-text: #e8f0fe;
-  --color-muted: #5a7a8a;
-  --radius-xl: 12px;
+
+  --app-nav-h: 68px;
+
+  --color-bg: #f4f8ff;
+  --color-surface: #ffffff;
+  --color-border-color: #d6e5ff;
+  --color-brand: #3399FF;
+  --color-brand-end: #007FFF;
+  --color-brand-start: #FF7F40;
+  --color-brand-dim: #9cc7ff;
+  --color-amber: #FFB180;
+  --color-red: #d33f49;
+  --color-text: #0f2244;
+  --color-muted: #6481a8;
+  --radius-xl: 30px;
+  --radius-lg: 18px;
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
   }
+
   body {
-    @apply bg-bg text-text font-sans min-h-screen overflow-x-hidden;
+    @apply bg-bg text-text font-sans min-h-screen overflow-x-hidden antialiased;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(51, 153, 255, 0.2), transparent 32%),
+      radial-gradient(circle at 90% -4%, rgba(255, 127, 64, 0.24), transparent 28%),
+      radial-gradient(circle at 76% 84%, rgba(0, 127, 255, 0.16), transparent 34%),
+      linear-gradient(rgba(15, 34, 68, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 34, 68, 0.05) 1px, transparent 1px);
+    background-size: auto, auto, auto, 26px 26px, 26px 26px;
+    background-position: 0 0;
+  }
+
+  #root {
+    @apply min-h-screen;
   }
 }
 
 @layer utilities {
+  @keyframes camera-live-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(0, 127, 255, 0.18);
+    }
+    70% {
+      box-shadow: 0 0 0 8px rgba(0, 127, 255, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(0, 127, 255, 0);
+    }
+  }
+
+  @keyframes sentence-reveal {
+    0% {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes waveform-bar {
+    0%,
+    100% {
+      transform: scaleY(0.45);
+      opacity: 0.45;
+    }
+    50% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  .camera-live-shell {
+    box-shadow: 0 0 0 1px rgba(191, 223, 255, 0.8), 0 16px 30px rgba(0, 127, 255, 0.16);
+  }
+
+  .camera-live-pulse {
+    animation: camera-live-pulse 2.4s ease-in-out infinite;
+  }
+
+  .sentence-reveal {
+    animation: sentence-reveal 360ms ease-out;
+  }
+
+  .wave-bar {
+    width: 4px;
+    height: 14px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #007fff, #4ea9ff);
+    animation: waveform-bar 940ms ease-in-out infinite;
+    transform-origin: bottom center;
+  }
+
   .btn {
-    @apply px-4 py-3 border-none rounded-lg font-sans font-medium text-[0.9rem] cursor-pointer transition-all duration-200 min-w-[100px];
+    @apply px-4 py-3 rounded-lg font-sans font-semibold text-[0.9rem] cursor-pointer transition-all duration-200 min-w-[100px];
   }
+
   .btn-primary {
-    @apply bg-brand text-black hover:bg-[#00f0c3] hover:-translate-y-[1px] disabled:bg-brand-dim disabled:cursor-not-allowed disabled:transform-none disabled:opacity-60;
+    @apply bg-brand text-white hover:bg-brand-end hover:-translate-y-[1px] disabled:bg-brand-dim disabled:cursor-not-allowed disabled:transform-none disabled:opacity-60 shadow-[0_8px_22px_rgba(0,127,255,0.26)];
   }
+
   .btn-secondary {
-    @apply bg-transparent text-text border border-border-color hover:border-brand hover:text-brand;
+    @apply bg-white text-text border border-border-color hover:border-brand hover:text-brand;
   }
+
   .btn-danger {
-    @apply bg-transparent text-red border border-[rgba(255,95,95,0.3)] hover:bg-[rgba(255,95,95,0.1)];
+    @apply bg-white text-red border border-[#f5c4c7] hover:bg-[#fff1f2];
   }
 }

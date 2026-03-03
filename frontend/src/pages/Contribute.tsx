@@ -65,7 +65,7 @@ export function Contribute() {
     return (
         <div className="px-5 md:px-10 py-12 max-w-[860px] mx-auto min-h-[85vh]">
             <div className="mb-10 pl-1 animate-in fade-in zoom-in-95 duration-500 ease-out">
-                <h1 className="font-heading font-extrabold text-[clamp(2rem,4vw,3rem)] leading-[1.1] mb-2 tracking-tight">
+                <h1 className="font-heading font-extrabold text-[clamp(2rem,4vw,3rem)] leading-[1.1] pb-[0.08em] mb-2 tracking-tight">
                     Contribute a <em className="text-brand not-italic">Sign</em>
                 </h1>
                 <p className="text-muted leading-relaxed max-w-[500px]">

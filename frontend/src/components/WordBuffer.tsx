@@ -6,9 +6,9 @@ interface WordBufferProps {
 
 export function WordBuffer({ words }: WordBufferProps) {
     return (
-        <div className="p-4 border-t border-border-color min-h-[72px] flex flex-wrap gap-2 items-center">
+        <div className="min-h-[56px] rounded-2xl border border-border-color bg-[#f8fbff] p-3 flex flex-wrap items-center gap-2 [@media(max-height:820px)]:min-h-[44px] [@media(max-height:820px)]:p-2.5">
             {words.length === 0 ? (
-                <span className="text-muted text-[0.85rem] italic">
+                <span className="text-muted text-[0.82rem] italic font-medium tracking-wide">
                     Words will appear here as you sign...
                 </span>
             ) : (
@@ -20,7 +20,7 @@ export function WordBuffer({ words }: WordBufferProps) {
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.8 }}
                             transition={{ duration: 0.2 }}
-                            className="bg-[rgba(0,212,170,0.1)] border border-[rgba(0,212,170,0.3)] text-brand px-3 py-1 rounded-full text-[0.85rem] font-medium block"
+                            className="block rounded-full border border-[#c8ddff] bg-white px-3 py-1.5 text-[0.74rem] font-bold uppercase tracking-[0.12em] text-brand shadow-[0_6px_16px_rgba(0,127,255,0.15)]"
                         >
                             {word}
                         </motion.span>

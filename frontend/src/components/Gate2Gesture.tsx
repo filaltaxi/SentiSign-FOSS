@@ -98,7 +98,7 @@ export function Gate2Gesture({ word, onBack, onContinue }: Gate2GestureProps) {
                     isPhysicalRight = label === 'Left'; // MIRRORED logical flip
                 }
 
-                const color = isPhysicalRight ? '#00d4aa' : '#ff9a3c';
+                const color = isPhysicalRight ? '#007FFF' : '#FF7F40';
                 window.drawConnectors(ctx, lm, window.HAND_CONNECTIONS, { color: color + '55', lineWidth: 2 });
                 window.drawLandmarks(ctx, lm, { color, lineWidth: 1, radius: 3 });
 
@@ -200,7 +200,7 @@ export function Gate2Gesture({ word, onBack, onContinue }: Gate2GestureProps) {
                 Show us your sign for <strong className="text-text">{word}</strong> once so we can check it doesn't look like an existing sign.
             </p>
 
-            <div className="relative bg-black rounded-lg overflow-hidden aspect-4/3 mb-6 border border-border-color shadow-inner">
+            <div className="relative bg-[#edf5ff] rounded-lg overflow-hidden aspect-4/3 mb-6 border border-border-color shadow-inner">
                 <video
                     ref={videoRef}
                     autoPlay
@@ -212,7 +212,7 @@ export function Gate2Gesture({ word, onBack, onContinue }: Gate2GestureProps) {
                     ref={canvasRef}
                     className="absolute inset-0 w-full h-full pointer-events-none scale-x-[-1]"
                 />
-                <div className="absolute bottom-3 left-3 right-3 bg-black/70 backdrop-blur-sm border border-border-color/50 rounded-lg px-3 py-2 text-[0.85rem] text-center flex items-center justify-between">
+                <div className="absolute bottom-3 left-3 right-3 bg-white/90 backdrop-blur-sm border border-border-color/80 rounded-lg px-3 py-2 text-[0.85rem] text-center flex items-center justify-between text-text">
                     <span>{statusText}</span>
                     {!isDone && (
                         <strong className="text-brand font-mono ml-2 text-[0.95rem]">
@@ -220,7 +220,7 @@ export function Gate2Gesture({ word, onBack, onContinue }: Gate2GestureProps) {
                         </strong>
                     )}
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 h-1bg-border-color">
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-border-color">
                     <div
                         className="h-full bg-brand transition-all duration-100 ease-linear"
                         style={{ width: `${progress}%` }}
@@ -246,7 +246,7 @@ export function Gate2Gesture({ word, onBack, onContinue }: Gate2GestureProps) {
                             </div>
                         )}
                         {result.status === 'unique' && (
-                            <div className="bg-[rgba(0,212,170,0.08)] border border-[rgba(0,212,170,0.25)] text-brand px-4 py-3.5 rounded-lg text-[0.95rem] flex items-start gap-3">
+                            <div className="bg-[rgba(51,153,255,0.08)] border border-[rgba(51,153,255,0.25)] text-brand px-4 py-3.5 rounded-lg text-[0.95rem] flex items-start gap-3">
                                 <span className="text-[1.1rem] leading-none">&#10003;</span>
                                 <span className="flex-1 font-medium">Sign looks unique &mdash; no collision with existing vocabulary.</span>
                             </div>

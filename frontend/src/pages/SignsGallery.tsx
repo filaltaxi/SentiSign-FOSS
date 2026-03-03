@@ -29,7 +29,7 @@ export function SignsGallery() {
         <div className="px-5 md:px-10 py-12 max-w-[1200px] mx-auto animate-in fade-in zoom-in-95 duration-500 ease-out">
 
             <div className="mb-8">
-                <h1 className="font-heading font-extrabold text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.1] mb-3 tracking-tight">
+                <h1 className="font-heading font-extrabold text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.1] pb-[0.08em] mb-3 tracking-tight">
                     Signs <em className="text-brand not-italic">Gallery</em>
                 </h1>
                 <p className="text-muted text-[1.05rem] max-w-[500px] leading-relaxed">
@@ -66,14 +66,14 @@ export function SignsGallery() {
                                 exit={{ opacity: 0, scale: 0.9 }}
                                 transition={{ duration: 0.2 }}
                                 key={s.class}
-                                className="group bg-surface border border-border-color rounded-xl overflow-hidden relative transition-all duration-300 hover:border-brand hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,212,170,0.1)] cursor-pointer"
+                                className="group bg-surface border border-border-color rounded-xl overflow-hidden relative transition-all duration-300 hover:border-brand hover:-translate-y-1 hover:shadow-[0_12px_24px_rgba(0,127,255,0.16)] cursor-pointer"
                             >
                                 {s.class.startsWith('CUSTOM_') && (
-                                    <div className="absolute top-2 right-2 z-10 bg-[rgba(0,212,170,0.15)] border border-[rgba(0,212,170,0.3)] text-brand rounded shadow-sm px-1.5 py-0.5 text-[0.6rem] font-bold tracking-wider">
+                                    <div className="absolute top-2 right-2 z-10 bg-[#fff0e7] border border-[#ffc7a9] text-[#c85a21] rounded shadow-sm px-1.5 py-0.5 text-[0.6rem] font-bold tracking-wider">
                                         NEW
                                     </div>
                                 )}
-                                <div className="w-full aspect-square bg-black relative flex items-center justify-center overflow-hidden border-b border-border-color">
+                                <div className="w-full aspect-square bg-[#edf5ff] relative flex items-center justify-center overflow-hidden border-b border-border-color">
                                     {s.gif_url ? (
                                         <img src={s.gif_url} alt={s.word} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
                                     ) : (
@@ -81,7 +81,7 @@ export function SignsGallery() {
                                     )}
                                 </div>
                                 <div className="p-3 bg-surface/80 backdrop-blur">
-                                    <div className="font-heading font-bold text-[1rem] text-white truncate mb-0.5">{s.word}</div>
+                                    <div className="font-heading font-bold text-[1rem] text-text truncate mb-0.5">{s.word}</div>
                                     <div className="text-[0.7rem] text-muted truncate">Sign: {s.class}</div>
                                 </div>
                             </motion.div>

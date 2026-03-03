@@ -105,7 +105,7 @@ export function Gate3Record({ word, onBack, onSubmit }: Gate3RecordProps) {
                 isPhysicalRight = label === 'Left';
             }
 
-            const color = isPhysicalRight ? '#00d4aa' : '#ff9a3c';
+            const color = isPhysicalRight ? '#007FFF' : '#FF7F40';
             window.drawConnectors(ctx, lm, window.HAND_CONNECTIONS, { color: color + '55', lineWidth: 2 });
             window.drawLandmarks(ctx, lm, { color, lineWidth: 1, radius: 3 });
         }
@@ -163,7 +163,7 @@ export function Gate3Record({ word, onBack, onSubmit }: Gate3RecordProps) {
         // Draw landmarks over frame
         for (let hi = 0; hi < res.multiHandLandmarks.length; hi++) {
             const hLm = res.multiHandLandmarks[hi];
-            tmpCtx.strokeStyle = '#00d4aa88';
+            tmpCtx.strokeStyle = '#007FFF88';
             tmpCtx.lineWidth = 2;
             for (const [a, b] of window.HAND_CONNECTIONS) {
                 const ax = tmpC.width - hLm[a].x * tmpC.width;
@@ -175,7 +175,7 @@ export function Gate3Record({ word, onBack, onSubmit }: Gate3RecordProps) {
                 tmpCtx.lineTo(bx, by);
                 tmpCtx.stroke();
             }
-            tmpCtx.fillStyle = '#00d4aa';
+            tmpCtx.fillStyle = '#007FFF';
             for (const lmPt of hLm) {
                 const px = tmpC.width - lmPt.x * tmpC.width;
                 const py = lmPt.y * tmpC.height;
@@ -260,7 +260,7 @@ export function Gate3Record({ word, onBack, onSubmit }: Gate3RecordProps) {
                     className="absolute inset-0 w-full h-full pointer-events-none scale-x-[-1]"
                 />
                 <div className="absolute top-3 inset-x-3 text-center pointer-events-none">
-                    <span className="bg-black/80 backdrop-blur-sm border border-border-color/50 rounded-full px-4 py-1.5 text-[0.85rem] inline-block shadow-md text-white font-medium">
+                    <span className="bg-white/90 backdrop-blur-sm border border-border-color/80 rounded-full px-4 py-1.5 text-[0.85rem] inline-block shadow-md text-text font-medium">
                         {statusText}
                     </span>
                 </div>
@@ -273,7 +273,7 @@ export function Gate3Record({ word, onBack, onSubmit }: Gate3RecordProps) {
                 </div>
                 <div className="h-2.5 bg-surface border border-border-color rounded-full overflow-hidden">
                     <div
-                        className={`h-full transition-all duration-300 ${canSubmit ? 'bg-brand shadow-[0_0_10px_var(--color-brand)]' : 'bg-[#00907a]'}`}
+                        className={`h-full transition-all duration-300 ${canSubmit ? 'bg-brand shadow-[0_0_10px_var(--color-brand)]' : 'bg-[#9cc7ff]'}`}
                         style={{ width: `${progressPct}%` }}
                     />
                 </div>

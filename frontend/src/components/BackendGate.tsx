@@ -184,13 +184,13 @@ export function BackendGate({ children }: { children: ReactNode }) {
             <div className="absolute inset-0 opacity-60 pointer-events-none"
                 style={{
                     background:
-                        'radial-gradient(900px 500px at 20% 15%, rgba(0,212,170,0.18), transparent 60%),' +
-                        'radial-gradient(700px 420px at 85% 80%, rgba(255,179,71,0.14), transparent 60%)'
+                        'radial-gradient(900px 500px at 20% 15%, rgba(51,153,255,0.24), transparent 60%),' +
+                        'radial-gradient(700px 420px at 85% 80%, rgba(255,127,64,0.18), transparent 60%)'
                 }}
             />
 
             <div className="relative max-w-[740px] mx-auto px-6 py-14">
-                <div className="bg-surface border border-border-color rounded-2xl p-7 shadow-[0_18px_60px_rgba(0,0,0,0.45)]">
+                <div className="bg-surface border border-border-color rounded-2xl p-7 shadow-[0_18px_52px_rgba(15,34,68,0.14)]">
                     <div className="flex items-center gap-3 mb-3">
                         {body?.icon}
                         <h1 className="font-heading font-extrabold text-[1.35rem] tracking-tight">

@@ -1,50 +1,125 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 
 export function MainLayout() {
+    const location = useLocation();
+    const prefersReducedMotion = useReducedMotion();
+
+    const pillTransition = prefersReducedMotion
+        ? { duration: 0 }
+        : { type: 'spring' as const, stiffness: 560, damping: 44, mass: 0.7 };
+
     return (
         <>
-            <nav className="flex items-center justify-between px-10 py-4.5 border-b border-border-color bg-[rgba(10,14,20,0.95)] sticky top-0 z-100 backdrop-blur-md">
-                <div className="font-heading font-extrabold text-[1.4rem] text-brand tracking-tight">
-                    Senti<span className="text-text">Sign</span>
-                </div>
-                <div className="flex gap-8">
-                    <NavLink
-                        to="/"
-                        className={({ isActive }) =>
-                            `text-[0.9rem] font-medium transition-colors duration-200 hover:text-brand ${isActive ? 'text-brand' : 'text-muted'}`
-                        }
-                    >
-                        Communicate
-                    </NavLink>
-                    <NavLink
-                        to="/signs"
-                        className={({ isActive }) =>
-                            `text-[0.9rem] font-medium transition-colors duration-200 hover:text-brand ${isActive ? 'text-brand' : 'text-muted'}`
-                        }
-                    >
-                        Signs
-                    </NavLink>
-                    <NavLink
-                        to="/contribute"
-                        className={({ isActive }) =>
-                            `text-[0.9rem] font-medium transition-colors duration-200 hover:text-brand ${isActive ? 'text-brand' : 'text-muted'}`
-                        }
-                    >
-                        Contribute
-                    </NavLink>
-                    <NavLink
-                        to="/about"
-                        className={({ isActive }) =>
-                            `text-[0.9rem] font-medium transition-colors duration-200 hover:text-brand ${isActive ? 'text-brand' : 'text-muted'}`
-                        }
-                    >
-                        About
-                    </NavLink>
+            <nav className="sticky top-0 z-50 h-[var(--app-nav-h)] border-b border-border-color/70 bg-white/75 backdrop-blur-md">
+                <div className="mx-auto flex h-full w-full max-w-[1400px] items-center justify-between px-4 sm:px-8">
+                    <div className="flex items-center gap-2 font-heading text-[1.25rem] font-extrabold leading-[1.1] tracking-tight text-text pb-[0.08em]">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-brand to-brand-end shadow-[0_8px_18px_rgba(0,127,255,0.30)]">
+                            <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                        </span>
+                        Senti<span className="inline-block text-brand-end [text-shadow:0_1px_0_rgba(0,0,0,0.10)]">Sign</span>
+                    </div>
+
+                    <LayoutGroup id="top-nav">
+                        <div className="flex items-center gap-1 rounded-full border border-border-color bg-white/90 p-1 shadow-[0_8px_22px_rgba(15,34,68,0.08)]">
+                        <NavLink
+                            to="/"
+                            className={({ isActive }) =>
+                                `relative flex h-10 items-center justify-center rounded-full px-3.5 text-[0.82rem] font-semibold tracking-wide transition-colors duration-200 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 ${isActive ? 'text-white' : 'text-muted hover:bg-[#f2f7ff] hover:text-text'}`
+                            }
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    {isActive && (
+                                        <motion.span
+                                            layoutId="nav-active-pill"
+                                            transition={pillTransition}
+                                            className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-r from-brand to-brand-end shadow-[0_10px_22px_rgba(0,127,255,0.26)]"
+                                        />
+                                    )}
+                                    <span className="relative z-10">Communicate</span>
+                                </>
+                            )}
+                        </NavLink>
+                        <NavLink
+                            to="/signs"
+                            className={({ isActive }) =>
+                                `relative flex h-10 items-center justify-center rounded-full px-3.5 text-[0.82rem] font-semibold tracking-wide transition-colors duration-200 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 ${isActive ? 'text-white' : 'text-muted hover:bg-[#f2f7ff] hover:text-text'}`
+                            }
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    {isActive && (
+                                        <motion.span
+                                            layoutId="nav-active-pill"
+                                            transition={pillTransition}
+                                            className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-r from-brand to-brand-end shadow-[0_10px_22px_rgba(0,127,255,0.26)]"
+                                        />
+                                    )}
+                                    <span className="relative z-10">Signs</span>
+                                </>
+                            )}
+                        </NavLink>
+                        <NavLink
+                            to="/contribute"
+                            className={({ isActive }) =>
+                                `relative flex h-10 items-center justify-center rounded-full px-3.5 text-[0.82rem] font-semibold tracking-wide transition-colors duration-200 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 ${isActive ? 'text-white' : 'text-muted hover:bg-[#f2f7ff] hover:text-text'}`
+                            }
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    {isActive && (
+                                        <motion.span
+                                            layoutId="nav-active-pill"
+                                            transition={pillTransition}
+                                            className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-r from-brand to-brand-end shadow-[0_10px_22px_rgba(0,127,255,0.26)]"
+                                        />
+                                    )}
+                                    <span className="relative z-10">Contribute</span>
+                                </>
+                            )}
+                        </NavLink>
+                        <NavLink
+                            to="/about"
+                            className={({ isActive }) =>
+                                `relative flex h-10 items-center justify-center rounded-full px-3.5 text-[0.82rem] font-semibold tracking-wide transition-colors duration-200 active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 ${isActive ? 'text-white' : 'text-muted hover:bg-[#f2f7ff] hover:text-text'}`
+                            }
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    {isActive && (
+                                        <motion.span
+                                            layoutId="nav-active-pill"
+                                            transition={pillTransition}
+                                            className="pointer-events-none absolute inset-0 rounded-full bg-gradient-to-r from-brand to-brand-end shadow-[0_10px_22px_rgba(0,127,255,0.26)]"
+                                        />
+                                    )}
+                                    <span className="relative z-10">About</span>
+                                </>
+                            )}
+                        </NavLink>
+                        </div>
+                    </LayoutGroup>
                 </div>
             </nav>
 
             <main>
-                <Outlet />
+                <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                        key={location.pathname}
+                        initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                        animate={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
+                        exit={prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: -6 }}
+                        transition={
+                            prefersReducedMotion
+                                ? { duration: 0 }
+                                : { duration: 0.18, ease: [0.2, 0.9, 0.2, 1] }
+                        }
+                        className="min-h-[calc(100dvh-var(--app-nav-h))]"
+                    >
+                        <Outlet />
+                    </motion.div>
+                </AnimatePresence>
             </main>
         </>
     );

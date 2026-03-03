@@ -7,7 +7,7 @@ export function About() {
             animate={{ opacity: 1, y: 0 }}
             className="px-5 md:px-10 py-12 max-w-[860px] mx-auto min-h-[85vh]"
         >
-            <h1 className="font-heading font-extrabold text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.1] mb-4 tracking-tight">
+            <h1 className="font-heading font-extrabold text-[clamp(2.2rem,5vw,3.5rem)] leading-[1.1] pb-[0.08em] mb-4 tracking-tight">
                 About <em className="text-brand not-italic">SentiSign</em>
             </h1>
             <p className="text-muted text-[1.1rem] leading-relaxed mb-12 max-w-[650px]">
@@ -23,8 +23,8 @@ export function About() {
                             1
                         </div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-[1.1rem] text-white">Sign Recognition</h3>
-                            <span className="text-[0.7rem] px-2 py-0.5 rounded-md bg-[rgba(0,212,170,0.1)] border border-brand/20 text-brand font-medium">MediaPipe + MLP</span>
+                            <h3 className="font-semibold text-[1.1rem] text-text">Sign Recognition</h3>
+                            <span className="text-[0.7rem] px-2 py-0.5 rounded-md bg-[rgba(51,153,255,0.12)] border border-brand/20 text-brand font-medium">MediaPipe + MLP</span>
                         </div>
                         <p className="text-muted text-[0.95rem] leading-relaxed max-w-[600px]">
                             MediaPipe Hands extracts 21 three-dimensional landmarks per hand (126 features for two hands). A lightweight MLP classifier maps normalised landmark coordinates to vocabulary words. Background, lighting, and skin tone are irrelevant &mdash; only hand geometry matters.
@@ -36,7 +36,7 @@ export function About() {
                             2
                         </div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-[1.1rem] text-white">Emotion Recognition</h3>
+                            <h3 className="font-semibold text-[1.1rem] text-text">Emotion Recognition</h3>
                             <span className="text-[0.7rem] px-2 py-0.5 rounded-md bg-[rgba(255,179,71,0.1)] border border-amber/20 text-amber font-medium">ResNet CNN</span>
                         </div>
                         <p className="text-muted text-[0.95rem] leading-relaxed max-w-[600px]">
@@ -49,8 +49,8 @@ export function About() {
                             3
                         </div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-[1.1rem] text-white">Sentence Generation</h3>
-                            <span className="text-[0.7rem] px-2 py-0.5 rounded-md bg-[rgba(0,212,170,0.1)] border border-brand/20 text-brand font-medium">Flan-T5-Large</span>
+                            <h3 className="font-semibold text-[1.1rem] text-text">Sentence Generation</h3>
+                            <span className="text-[0.7rem] px-2 py-0.5 rounded-md bg-[rgba(51,153,255,0.12)] border border-brand/20 text-brand font-medium">Flan-T5-Large</span>
                         </div>
                         <p className="text-muted text-[0.95rem] leading-relaxed max-w-[600px]">
                             Recognised words are passed to Flan-T5-Large, an instruction-tuned language model that converts telegraphic word sequences into grammatically complete sentences &mdash; zero-shot, no fine-tuning required.
@@ -62,7 +62,7 @@ export function About() {
                             4
                         </div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-[1.1rem] text-white">Emotion-Aware Speech</h3>
+                            <h3 className="font-semibold text-[1.1rem] text-text">Emotion-Aware Speech</h3>
                             <span className="text-[0.7rem] px-2 py-0.5 rounded-md bg-[rgba(255,179,71,0.1)] border border-amber/20 text-amber font-medium">Chatterbox-TTS</span>
                         </div>
                         <p className="text-muted text-[0.95rem] leading-relaxed max-w-[600px]">
@@ -83,12 +83,12 @@ export function About() {
                         { name: 'Sudipto Bagchi', role: 'Student, ECE' },
                     ].map(member => (
                         <div key={member.name} className="bg-surface border border-border-color p-4 rounded-xl flex flex-col justify-center">
-                            <span className="font-heading font-bold text-[0.95rem] text-white">{member.name}</span>
+                            <span className="font-heading font-bold text-[0.95rem] text-text">{member.name}</span>
                             <span className="text-[0.8rem] text-muted">{member.role}</span>
                         </div>
                     ))}
                 </div>
-                <div className="bg-surface border border-[rgba(0,212,170,0.3)] p-4 rounded-xl w-full sm:w-[calc(50%-8px)] mb-3">
+                <div className="bg-surface border border-[rgba(51,153,255,0.35)] p-4 rounded-xl w-full sm:w-[calc(50%-8px)] mb-3">
                     <span className="font-heading font-bold text-[0.95rem] text-brand">Jasmin Sebastin</span>
                     <span className="block text-[0.8rem] text-muted">Guide, Asst. Professor</span>
                 </div>

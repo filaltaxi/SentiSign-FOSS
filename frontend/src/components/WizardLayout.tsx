@@ -29,8 +29,8 @@ export function WizardLayout({ steps, currentStep, children }: WizardLayoutProps
                             className={twMerge(
                                 clsx(
                                     "flex-1 text-center py-3.5 px-4 transition-all duration-300 border-r border-border-color last:border-r-0 relative",
-                                    isActive ? "bg-[rgba(0,212,170,0.08)] before:absolute before:bottom-0 before:left-0 before:right-0 before:h-0.5 before:bg-brand" : "",
-                                    isDone ? "bg-[rgba(0,212,170,0.03)]" : ""
+                                    isActive ? "bg-[rgba(51,153,255,0.08)] before:absolute before:bottom-0 before:left-0 before:right-0 before:h-0.5 before:bg-brand" : "",
+                                    isDone ? "bg-[rgba(51,153,255,0.03)]" : ""
                                 )
                             )}
                         >

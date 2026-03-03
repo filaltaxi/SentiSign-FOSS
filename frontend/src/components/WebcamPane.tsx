@@ -90,7 +90,7 @@ export function WebcamPane({
                 isPhysicalRight = label === 'Left';
             }
 
-            const color = isPhysicalRight ? '#00d4aa' : '#ff9a3c';
+            const color = isPhysicalRight ? '#007FFF' : '#FF7F40';
 
             window.drawConnectors(ctx, lm, window.HAND_CONNECTIONS, { color: color + '55', lineWidth: 2 });
             window.drawLandmarks(ctx, lm, { color, lineWidth: 1, radius: 3 });
@@ -106,7 +106,7 @@ export function WebcamPane({
             ctx.lineWidth = 2;
             ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
             ctx.fillStyle = color;
-            ctx.font = '13px "DM Sans"';
+            ctx.font = '13px "Manrope"';
             ctx.fillText(isPhysicalRight ? 'L' : 'R', x1 + 4, y1 - 4);
         }
 
@@ -288,29 +288,30 @@ export function WebcamPane({
     }, [isActive, onHandResults]);
 
     return (
-        <div className="bg-surface border border-border-color rounded-xl overflow-hidden relative shadow-lg">
-            <div className="relative aspect-4/3 bg-black">
+        <div className={`relative overflow-hidden rounded-2xl border bg-[#eef5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-500 ${isActive ? 'camera-live-shell border-[#9fc9ff] shadow-[0_18px_36px_rgba(0,127,255,0.22)]' : 'border-[#c9defd]'}`}>
+            <div className="relative aspect-4/3 bg-[#d6e7ff]">
                 <video
                     ref={videoRef}
                     autoPlay
                     muted
                     playsInline
-                    className="w-full h-full object-cover block scale-x-[-1]"
+                    className={`block h-full w-full scale-x-[-1] object-cover transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-55 saturate-75'}`}
                 />
                 <canvas
                     ref={canvasRef}
-                    className="absolute inset-0 w-full h-full pointer-events-none scale-x-[-1]"
+                    className="pointer-events-none absolute inset-0 h-full w-full scale-x-[-1]"
                 />
+                <div className={`pointer-events-none absolute inset-0 border transition-all duration-500 ${isActive ? 'camera-live-pulse border-[rgba(71,158,255,0.72)]' : 'border-transparent'}`} />
 
                 {/* Top Left Status */}
-                <div className="absolute top-3 left-3 bg-black/70 border border-border-color rounded-lg px-3 py-1.5 text-[0.75rem] flex items-center gap-1.5 backdrop-blur-sm">
-                    <div className={`w-2 h-2 rounded-full transition-colors duration-300 ${isActive ? (confidence > 0 ? 'bg-amber shadow-[0_0_8px_var(--color-amber)]' : 'bg-brand shadow-[0_0_8px_var(--color-brand)]') : 'bg-muted'}`} />
-                    <span>{isActive ? 'Session active' : 'Camera off'}</span>
+                <div className={`absolute left-3 top-3 flex items-center gap-2.5 rounded-full border bg-white/95 px-3 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.14em] shadow-[0_8px_18px_rgba(15,34,68,0.12)] ${isActive ? 'border-[#c0dbff] text-brand' : 'border-[#c8defe] text-muted'}`}>
+                    <div className={`h-2.5 w-2.5 rounded-full transition-all duration-300 ${isActive ? 'bg-brand shadow-[0_0_12px_rgba(0,127,255,0.7)]' : 'bg-[#9ab5d7]'}`} />
+                    <span>{isActive ? 'LIVE' : 'Standby'}</span>
                 </div>
 
                 {/* Top Right Emotion */}
                 <div
-                    className={`absolute top-3 right-3 bg-black/70 border rounded-lg px-3.5 py-1.5 text-[0.8rem] font-medium capitalize transition-colors duration-400 backdrop-blur-sm`}
+                    className="absolute right-3 top-3 rounded-lg border bg-white/92 px-3 py-1.5 text-[0.78rem] font-semibold capitalize transition-colors duration-400"
                     style={{
                         borderColor: getEmotionColor(currentEmotion),
                         color: getEmotionColor(currentEmotion)
@@ -321,17 +322,17 @@ export function WebcamPane({
             </div>
 
             {/* Sign Confidence Strip */}
-            <div className="px-5 py-2.5 border-t border-border-color flex items-center gap-3 text-[0.8rem] text-muted bg-[#080d14]">
-                <span className="min-w-[140px] font-medium text-text truncate">
+            <div className={`flex items-center gap-4 border-t px-5 py-3.5 text-[0.82rem] transition-all duration-300 ${isActive ? 'border-[#c8defe] bg-[#f4f9ff]' : 'border-border-color bg-white'}`}>
+                <span className={`min-w-[160px] truncate text-[0.77rem] font-bold uppercase tracking-[0.15em] transition-colors ${isActive && confidence > 0 ? 'text-brand' : 'text-muted'}`}>
                     {wordLabel}
                 </span>
-                <div className="flex-1 h-1 bg-border-color rounded-full overflow-hidden">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#d8e8ff]">
                     <div
-                        className="h-full bg-brand rounded-full transition-all duration-200"
+                        className="h-full rounded-full bg-gradient-to-r from-brand to-brand-end transition-all duration-300 shadow-[0_0_10px_rgba(0,127,255,0.38)]"
                         style={{ width: `${Math.round(confidence * 100)}%` }}
                     />
                 </div>
-                <span className="min-w-[38px] text-right font-mono text-[0.75rem]">
+                <span className={`min-w-[45px] text-right font-mono text-[0.8rem] font-bold ${isActive && confidence > 0 ? 'text-brand' : 'text-muted'}`}>
                     {Math.round(confidence * 100)}%
                 </span>
             </div>
@@ -341,8 +342,13 @@ export function WebcamPane({
 
 function getEmotionColor(e: string) {
     const map: Record<string, string> = {
-        happy: '#ffd700', sad: '#6aa3d5', angry: '#ff5f5f',
-        fear: '#c084fc', disgust: '#86efac', surprise: '#ff9a3c', neutral: '#00d4aa'
+        happy: '#007FFF',
+        sad: '#5c8fd8',
+        angry: '#d33f49',
+        fear: '#6f8ab8',
+        disgust: '#6481a8',
+        surprise: '#FF7F40',
+        neutral: '#3399FF'
     };
-    return map[e] || '#00d4aa';
+    return map[e] || '#3399FF';
 }
