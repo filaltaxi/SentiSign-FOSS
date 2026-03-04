@@ -15,7 +15,7 @@ SentiSign translates ASL hand signs and facial emotion into natural, emotionally
 | 3 | MLP classifier maps landmarks to vocabulary words |
 | 4 | ResNet CNN detects facial emotion simultaneously |
 | 5 | Flan-T5-Large generates a grammatical sentence from word buffer |
-| 6 | Chatterbox-TTS synthesises emotion-aware speech |
+| 6 | Chatterbox (local) or ElevenLabs (cloud) synthesises speech |
 
 ---
 
@@ -49,6 +49,12 @@ python -m venv .venv
 ```bash
 pip install -r requirements.txt
 ```
+
+**3.1 — Configure TTS provider (optional)**
+```bash
+cp .env.example .env
+```
+Set `ELEVENLABS_API_KEY` if you want ElevenLabs. You can switch provider in the web UI (`Voice Engine`) or desktop pipeline prompt.
 
 **Alternative: install + run with `uv`**
 ```bash
@@ -119,7 +125,7 @@ SentiSign-OMAR/
 ├── src/
 │   ├── sign_recognizer.py          # Desktop pipeline (terminal)
 │   ├── emotion_detector.py         # ResNet FER
-│   ├── tts.py                      # Chatterbox TTS
+│   ├── tts.py                      # Multi-provider TTS (Chatterbox + ElevenLabs)
 │   └── emotion_map.py              # Emotion → prosody parameters
 │
 ├── frontend/
@@ -194,7 +200,7 @@ SentiSign-OMAR/
 - **Output:** grammatical sentence (`"I need help."`)
 
 ### Speech Synthesis
-- **Model:** Chatterbox-TTS
+- **Providers:** Chatterbox-TTS (local), ElevenLabs (`eleven_flash_v2_5`)
 - **Emotion profiles:** 7 (one per emotion class)
 - **Parameters tuned:** exaggeration, CFG weight
 
@@ -237,6 +243,7 @@ The gap in the standard approach is caused by distribution mismatch between stud
 | mediapipe | 0.10.9 | Last stable version before breaking API change |
 | onnx | 1.14.1 | protobuf 3.x compatibility |
 | protobuf | 3.20.3 | mediapipe requirement |
+| elevenlabs | latest | Cloud TTS provider (`eleven_flash_v2_5`) |
 
 ---
 

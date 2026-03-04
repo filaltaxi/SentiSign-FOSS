@@ -1,5 +1,5 @@
 # SentiSign — Setup & Run Guide
-## Stack: flan-t5-large + Chatterbox-TTS | Python 3.10 | Windows
+## Stack: flan-t5-large + Chatterbox/ElevenLabs TTS | Python 3.10 | Windows
 
 ---
 
@@ -33,7 +33,7 @@ SentiSign-OMAR/
 ├── requirements.txt         ← all dependencies
 │
 ├── src/                     ← TTS + emotion modules
-│   ├── tts.py               ← Chatterbox wrapper
+│   ├── tts.py               ← TTS wrapper (Chatterbox + ElevenLabs)
 │   ├── emotion_map.py       ← emotion → exaggeration + cfg_weight
 │   └── play_audio.py        ← sounddevice playback, .wav saving
 │
@@ -78,6 +78,12 @@ pip install -r requirements.txt
 > `chatterbox-tts` pulls in torch + torchaudio automatically.
 > No SOX. No espeak-ng. No system tools needed on Windows.
 
+If you plan to use ElevenLabs:
+```bat
+copy .env.example .env
+```
+Set `ELEVENLABS_API_KEY` in `.env`.
+
 ---
 
 ## Step 3 — Download flan-t5-large (~3.1GB weights, one time only)
@@ -87,6 +93,7 @@ python slm\download_model.py
 ```
 
 > Chatterbox model (~1GB) auto-downloads on first `run_pipeline.py` run.
+> ElevenLabs does not download local weights (cloud API).
 
 ---
 

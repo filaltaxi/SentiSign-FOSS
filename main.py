@@ -104,7 +104,7 @@ _startup_status = {
         {'id': 'mlp', 'label': 'Sign model (landmark MLP)', 'state': 'pending', 'detail': None},
         {'id': 'emotion', 'label': 'Emotion model', 'state': 'pending', 'detail': None},
         {'id': 'sentence', 'label': 'Sentence model (flan-t5-large)', 'state': 'pending', 'detail': None},
-        {'id': 'tts', 'label': 'TTS model (Chatterbox)', 'state': 'pending', 'detail': None},
+        {'id': 'tts', 'label': 'TTS provider (Chatterbox/ElevenLabs)', 'state': 'pending', 'detail': None},
         {'id': 'custom_signs', 'label': 'Custom sign mappings', 'state': 'pending', 'detail': None},
     ],
 }
@@ -370,6 +370,9 @@ class EmotionRequest(BaseModel):
 class GenerateRequest(BaseModel):
     words: List[str]
     emotion: str = 'neutral'
+    tts_provider: Optional[str] = None
+    tts_voice_id: Optional[str] = None
+    tts_model_id: Optional[str] = None
 
 class SignCheckRequest(BaseModel):
     word: str
@@ -480,7 +483,7 @@ async def detect_emotion(req: EmotionRequest):
 
 @app.post('/api/generate_and_speak')
 async def generate_and_speak(req: GenerateRequest):
-    """Generate sentence from words + synthesise emotion-aware speech. Returns audio/wav."""
+    """Generate sentence from words + synthesise speech. Returns audio (wav/mp3)."""
     if not req.words:
         raise HTTPException(400, 'No words provided')
     try:
@@ -490,11 +493,27 @@ async def generate_and_speak(req: GenerateRequest):
         raise HTTPException(500, f'Sentence generation failed: {e}')
 
     try:
-        from tts import speak_and_save
+        from tts import get_output_extension, resolve_provider, speak_and_save
+        provider = resolve_provider(req.tts_provider)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f'TTS setup failed: {e}')
+
+    try:
+        ext = get_output_extension(provider)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename  = f'sentisign_{req.emotion}_{timestamp}.wav'
+        filename  = f'sentisign_{req.emotion}_{provider}_{timestamp}.{ext}'
         filepath  = os.path.join(AUDIO_DIR, filename)
-        speak_and_save(sentence, req.emotion, filepath, also_play=False)
+        speak_and_save(
+            sentence,
+            req.emotion,
+            filepath,
+            also_play=False,
+            provider=provider,
+            voice_id=req.tts_voice_id,
+            model_id=req.tts_model_id,
+        )
     except Exception as e:
         raise HTTPException(500, f'TTS failed: {e}')
 
@@ -502,12 +521,16 @@ async def generate_and_speak(req: GenerateRequest):
         with open(filepath, 'rb') as f:
             yield from f
 
+    media_type = 'audio/mpeg' if filename.lower().endswith('.mp3') else 'audio/wav'
+
     return StreamingResponse(
         iter_file(),
-        media_type='audio/wav',
+        media_type=media_type,
         headers={
             'X-Sentence': sentence,
             'X-Filename': filename,
+            'X-TTS-Provider': provider,
+            'X-TTS-Model': req.tts_model_id or 'default',
             'Content-Disposition': f'inline; filename="{filename}"',
         }
     )
@@ -522,13 +545,24 @@ def _tts_job_public(job: dict) -> dict:
         'updated_at': job.get('updated_at'),
         'sentence': job.get('sentence'),
         'emotion': job.get('emotion'),
+        'tts_provider': job.get('tts_provider'),
+        'tts_voice_id': job.get('tts_voice_id'),
+        'tts_model_id': job.get('tts_model_id'),
         'filename': job.get('filename'),
         'audio_url': job.get('audio_url'),
         'error': job.get('error'),
     }
 
 
-def _run_tts_job(job_id: str, sentence: str, emotion: str, filepath: str):
+def _run_tts_job(
+    job_id: str,
+    sentence: str,
+    emotion: str,
+    filepath: str,
+    tts_provider: str | None = None,
+    tts_voice_id: str | None = None,
+    tts_model_id: str | None = None,
+):
     """Background job that renders TTS to disk and updates job state."""
     now = datetime.now().isoformat()
     with _tts_jobs_lock:
@@ -540,7 +574,15 @@ def _run_tts_job(job_id: str, sentence: str, emotion: str, filepath: str):
 
     try:
         from tts import speak_and_save
-        speak_and_save(sentence, emotion, filepath, also_play=False)
+        speak_and_save(
+            sentence,
+            emotion,
+            filepath,
+            also_play=False,
+            provider=tts_provider,
+            voice_id=tts_voice_id,
+            model_id=tts_model_id,
+        )
         now = datetime.now().isoformat()
         with _tts_jobs_lock:
             job = _tts_jobs.get(job_id)
@@ -573,9 +615,19 @@ async def generate_and_speak_async(req: GenerateRequest, background_tasks: Backg
     except Exception as e:
         raise HTTPException(500, f'Sentence generation failed: {e}')
 
+    try:
+        from tts import get_output_extension, resolve_provider
+        provider = resolve_provider(req.tts_provider)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f'TTS setup failed: {e}')
+
+    ext = get_output_extension(provider)
+
     job_id = uuid.uuid4().hex
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename  = f'sentisign_{req.emotion}_{timestamp}_{job_id[:8]}.wav'
+    filename  = f'sentisign_{req.emotion}_{provider}_{timestamp}_{job_id[:8]}.{ext}'
     filepath  = os.path.join(AUDIO_DIR, filename)
     audio_url = f'/audio/{filename}'
     status_url = f'/api/tts_jobs/{job_id}'
@@ -587,6 +639,9 @@ async def generate_and_speak_async(req: GenerateRequest, background_tasks: Backg
         'updated_at': datetime.now().isoformat(),
         'sentence': sentence,
         'emotion': req.emotion,
+        'tts_provider': provider,
+        'tts_voice_id': req.tts_voice_id,
+        'tts_model_id': req.tts_model_id,
         'filename': filename,
         'audio_url': audio_url,
         'error': None,
@@ -596,7 +651,16 @@ async def generate_and_speak_async(req: GenerateRequest, background_tasks: Backg
     with _tts_jobs_lock:
         _tts_jobs[job_id] = job
 
-    background_tasks.add_task(_run_tts_job, job_id, sentence, req.emotion, filepath)
+    background_tasks.add_task(
+        _run_tts_job,
+        job_id,
+        sentence,
+        req.emotion,
+        filepath,
+        provider,
+        req.tts_voice_id,
+        req.tts_model_id,
+    )
     return _tts_job_public(job) | {'status_url': status_url}
 
 
@@ -606,7 +670,14 @@ async def get_tts_job(job_id: str):
         job = _tts_jobs.get(job_id)
         if not job:
             raise HTTPException(404, 'Unknown job id')
-        return _tts_job_public(job)
+        return JSONResponse(
+            _tts_job_public(job),
+            headers={
+                'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+            },
+        )
 
 
 @app.get('/api/signs')

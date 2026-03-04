@@ -63,53 +63,55 @@ export function Contribute() {
     };
 
     return (
-        <div className="px-5 md:px-10 py-12 max-w-[860px] mx-auto min-h-[85vh]">
-            <div className="mb-10 pl-1 animate-in fade-in zoom-in-95 duration-500 ease-out">
-                <h1 className="font-heading font-extrabold text-[clamp(2rem,4vw,3rem)] leading-[1.1] pb-[0.08em] mb-2 tracking-tight">
-                    Contribute a <em className="text-brand not-italic">Sign</em>
-                </h1>
-                <p className="text-muted leading-relaxed max-w-[500px]">
-                    Add a new word to SentiSign's vocabulary. The system checks for duplicates automatically before recording starts.
-                </p>
+        <div className="h-[calc(100dvh-var(--app-nav-h))] overflow-y-auto">
+            <div className="px-5 md:px-10 py-12 max-w-[860px] mx-auto min-h-full">
+                <div className="mb-10 pl-1 animate-in fade-in zoom-in-95 duration-500 ease-out">
+                    <h1 className="font-heading font-extrabold text-[clamp(2rem,4vw,3rem)] leading-[1.1] pb-[0.08em] mb-2 tracking-tight">
+                        Contribute a <em className="text-brand not-italic">Sign</em>
+                    </h1>
+                    <p className="text-muted leading-relaxed max-w-[500px]">
+                        Add a new word to SentiSign's vocabulary. The system checks for duplicates automatically before recording starts.
+                    </p>
+                </div>
+
+                <WizardLayout steps={STEPS} currentStep={currentStep}>
+                    <AnimatePresence mode="wait">
+                        {currentStep === 1 && (
+                            <Gate1WordCheck
+                                key="gate1"
+                                onWordChecked={handleWordChecked}
+                                onAddMoreSamples={handleAddMoreSamples}
+                            />
+                        )}
+
+                        {currentStep === 2 && (
+                            <Gate2Gesture
+                                key="gate2"
+                                word={targetWord}
+                                onBack={handleGate2Back}
+                                onContinue={handleGate2Continue}
+                            />
+                        )}
+
+                        {currentStep === 3 && (
+                            <Gate3Record
+                                key="gate3"
+                                word={targetWord}
+                                onBack={handleGate3Back}
+                                onSubmit={handleGate3Submit}
+                            />
+                        )}
+
+                        {currentStep === 4 && (
+                            <Gate4Success
+                                key="gate4"
+                                word={targetWord}
+                                onReset={handleReset}
+                            />
+                        )}
+                    </AnimatePresence>
+                </WizardLayout>
             </div>
-
-            <WizardLayout steps={STEPS} currentStep={currentStep}>
-                <AnimatePresence mode="wait">
-                    {currentStep === 1 && (
-                        <Gate1WordCheck
-                            key="gate1"
-                            onWordChecked={handleWordChecked}
-                            onAddMoreSamples={handleAddMoreSamples}
-                        />
-                    )}
-
-                    {currentStep === 2 && (
-                        <Gate2Gesture
-                            key="gate2"
-                            word={targetWord}
-                            onBack={handleGate2Back}
-                            onContinue={handleGate2Continue}
-                        />
-                    )}
-
-                    {currentStep === 3 && (
-                        <Gate3Record
-                            key="gate3"
-                            word={targetWord}
-                            onBack={handleGate3Back}
-                            onSubmit={handleGate3Submit}
-                        />
-                    )}
-
-                    {currentStep === 4 && (
-                        <Gate4Success
-                            key="gate4"
-                            word={targetWord}
-                            onReset={handleReset}
-                        />
-                    )}
-                </AnimatePresence>
-            </WizardLayout>
         </div>
     );
 }

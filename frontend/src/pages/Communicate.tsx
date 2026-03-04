@@ -4,7 +4,7 @@ import { WordBuffer } from '../components/WordBuffer';
 import { EmotionStrip } from '../components/EmotionStrip';
 import { SentenceOutput } from '../components/SentenceOutput';
 import type { EmotionType } from '../components/EmotionStrip';
-import { generateSentence, generateAudio } from '../lib/api.ts';
+import { generateSentence, generateAudio, type TtsProvider } from '../lib/api.ts';
 import { Play, Square, RotateCcw, XCircle } from 'lucide-react';
 
 const HOLD_FRAMES = 10;
@@ -17,6 +17,7 @@ export const Communicate: React.FC = () => {
     const [audioFilename, setAudioFilename] = useState<string | null>(null);
     const [generationStage, setGenerationStage] = useState<'idle' | 'sentence' | 'audio'>('idle');
     const [sessionActive, setSessionActive] = useState<boolean>(false);
+    const [ttsProvider, setTtsProvider] = useState<TtsProvider>('chatterbox');
     const [detectedEmotion, setDetectedEmotion] = useState<EmotionType>('neutral');
     const [emotionOverride, setEmotionOverride] = useState<EmotionType | null>(null);
     const [signLabel, setSignLabel] = useState<string>('No sign detected');
@@ -128,13 +129,19 @@ export const Communicate: React.FC = () => {
 
         setGenerationStage('sentence');
         try {
-            const data = await generateSentence(wordBuffer, selectedEmotion, { signal: abortController.signal });
+            const data = await generateSentence(wordBuffer, selectedEmotion, {
+                signal: abortController.signal,
+                ttsProvider,
+            });
             if (generationRunIdRef.current !== runId) return;
 
             if (data.sentence) {
                 setSentence(data.sentence);
                 setGenerationStage('audio');
-                const audioData = await generateAudio(data.sentence, selectedEmotion, { signal: abortController.signal });
+                const audioData = await generateAudio(data.sentence, selectedEmotion, {
+                    signal: abortController.signal,
+                    ttsProvider,
+                });
                 if (generationRunIdRef.current !== runId) return;
 
                 if (audioData.audio_url) {
@@ -155,7 +162,7 @@ export const Communicate: React.FC = () => {
     };
 
     return (
-        <div className="mx-auto grid h-[calc(100dvh-var(--app-nav-h))] w-full max-w-[1400px] grid-cols-1 items-start gap-4 overflow-hidden px-4 py-4 sm:px-8 lg:grid-cols-[minmax(0,1fr)_390px] lg:gap-6 [@media(max-height:820px)]:gap-3 [@media(max-height:820px)]:py-3">
+        <div className="mx-auto grid h-[calc(100dvh-var(--app-nav-h))] w-full max-w-[1400px] grid-cols-1 items-start gap-4 overflow-y-auto px-4 py-4 sm:px-8 lg:grid-cols-[minmax(0,1fr)_390px] lg:gap-6 lg:overflow-hidden [@media(max-height:820px)]:gap-3 [@media(max-height:820px)]:py-3">
             <section className="min-h-0 rounded-[26px] border border-border-color bg-surface/95 p-4 shadow-[0_16px_36px_rgba(15,34,68,0.12)] lg:p-5 flex flex-col gap-3 overflow-hidden [@media(max-height:820px)]:p-3">
                 <header className="flex items-end justify-between gap-4">
                     <div>
@@ -185,8 +192,8 @@ export const Communicate: React.FC = () => {
                 <WordBuffer words={wordBuffer} />
             </section>
 
-            <aside>
-                <section className="min-h-0 flex flex-col gap-3 rounded-[24px] border border-border-color bg-surface/95 p-4 shadow-[0_12px_30px_rgba(15,34,68,0.1)] lg:p-5 [@media(max-height:820px)]:p-3">
+            <aside className="min-h-0 h-full">
+                <section className="min-h-0 h-full overflow-y-auto [scrollbar-gutter:stable] flex flex-col gap-3 rounded-[24px] border border-border-color bg-surface/95 p-4 shadow-[0_12px_30px_rgba(15,34,68,0.1)] lg:p-5 [@media(max-height:820px)]:p-3">
                     <div className="flex items-center justify-between">
                         <h2 className="font-heading text-[0.74rem] font-bold uppercase tracking-[0.18em] text-muted">Control Panel</h2>
                         <div className="flex items-center gap-2 rounded-full border border-[#d2e4ff] bg-[#f3f8ff] px-2.5 py-1">
@@ -253,6 +260,24 @@ export const Communicate: React.FC = () => {
                                 <>&#10022; Generate &amp; Speak</>
                             )}
                         </button>
+                    </div>
+
+                    <div className="rounded-2xl border border-border-color bg-[#f9fbff] p-3">
+                        <h3 className="mb-2.5 font-heading text-[0.7rem] font-bold uppercase tracking-[0.18em] text-muted">Voice Engine</h3>
+                        <label className="mb-2 block text-[0.74rem] font-semibold uppercase tracking-[0.12em] text-muted">
+                            Provider
+                        </label>
+                        <select
+                            value={ttsProvider}
+                            onChange={(event) => setTtsProvider(event.target.value as TtsProvider)}
+                            className="h-10 w-full rounded-xl border border-border-color bg-white px-3 text-[0.82rem] font-semibold text-text outline-none transition-colors focus:border-brand"
+                        >
+                            <option value="chatterbox">Chatterbox (local)</option>
+                            <option value="elevenlabs">ElevenLabs (cloud)</option>
+                        </select>
+                        <p className="mt-2 text-[0.72rem] text-muted">
+                            ElevenLabs uses model <span className="font-semibold text-text">eleven_flash_v2_5</span>.
+                        </p>
                     </div>
 
                     <div className="rounded-2xl border border-border-color bg-[#f9fbff] p-3">

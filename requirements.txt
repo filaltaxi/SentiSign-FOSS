@@ -6,6 +6,8 @@
 
 # TTS — Chatterbox (real emotion control via exaggeration + cfg_weight)
 chatterbox-tts
+elevenlabs
+python-dotenv
 
 # Sentence generation — flan-t5-large
 # torch + transformers already pulled in by chatterbox-tts

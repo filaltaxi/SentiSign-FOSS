@@ -1,6 +1,11 @@
+export type TtsProvider = 'chatterbox' | 'elevenlabs';
+
 interface GenerateAndSpeakResponse {
     sentence: string;
     emotion: string;
+    tts_provider: TtsProvider;
+    tts_model_id?: string | null;
+    tts_voice_id?: string | null;
     filename: string;
     audio_url: string;
     status_url: string;
@@ -21,6 +26,7 @@ let latestJob: GenerateAndSpeakResponse | null = null;
 
 type RequestOptions = {
     signal?: AbortSignal;
+    ttsProvider?: TtsProvider;
 };
 
 const sleep = (ms: number, signal?: AbortSignal) =>
@@ -49,6 +55,9 @@ const sleep = (ms: number, signal?: AbortSignal) =>
     });
 
 const normalizeEmotion = (emotion: string) => emotion.trim().toLowerCase();
+const normalizeTtsProvider = (provider?: TtsProvider): TtsProvider => (
+    provider === 'elevenlabs' ? 'elevenlabs' : 'chatterbox'
+);
 
 const readErrorMessage = async (res: Response): Promise<string> => {
     try {
@@ -64,10 +73,16 @@ export const generateSentence = async (words: string[], emotion: string, options
         throw new Error('No words provided');
     }
 
+    const provider = normalizeTtsProvider(options?.ttsProvider);
     const response = await fetch(GENERATE_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ words, emotion: normalizeEmotion(emotion) }),
+        body: JSON.stringify({
+            words,
+            emotion: normalizeEmotion(emotion),
+            tts_provider: provider,
+            tts_model_id: provider === 'elevenlabs' ? 'eleven_flash_v2_5' : null,
+        }),
         signal: options?.signal,
     });
 
@@ -87,6 +102,7 @@ export const generateSentence = async (words: string[], emotion: string, options
 
 export const generateAudio = async (sentence: string, emotion: string, options?: RequestOptions) => {
     const normalizedEmotion = normalizeEmotion(emotion);
+    const selectedProvider = normalizeTtsProvider(options?.ttsProvider);
 
     if (!latestJob) {
         throw new Error('No generation job found. Generate sentence first.');
@@ -94,7 +110,8 @@ export const generateAudio = async (sentence: string, emotion: string, options?:
 
     if (
         latestJob.sentence !== sentence ||
-        normalizeEmotion(latestJob.emotion) !== normalizedEmotion
+        normalizeEmotion(latestJob.emotion) !== normalizedEmotion ||
+        latestJob.tts_provider !== selectedProvider
     ) {
         throw new Error('Generation job mismatch. Please regenerate the sentence.');
     }
@@ -102,7 +119,12 @@ export const generateAudio = async (sentence: string, emotion: string, options?:
     const deadline = Date.now() + POLL_TIMEOUT_MS;
 
     while (Date.now() < deadline) {
-        const statusResponse = await fetch(latestJob.status_url, { signal: options?.signal });
+        const statusUrl = `${latestJob.status_url}${latestJob.status_url.includes('?') ? '&' : '?'}_=${Date.now()}`;
+        const statusResponse = await fetch(statusUrl, {
+            signal: options?.signal,
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' },
+        });
 
         if (!statusResponse.ok) {
             throw new Error(`TTS status check failed: ${await readErrorMessage(statusResponse)}`);
