@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Sparkles, X, Image } from 'lucide-react';
+import { useModel } from '../model/ModelContext';
 
 type Sign = {
     word: string;
@@ -91,6 +92,8 @@ function SignsSkeletonList() {
 }
 
 export function SignsGallery() {
+    const { model } = useModel();
+    const activeModel = model ?? 'mlp';
     const [signs, setSigns] = useState<Sign[]>([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
@@ -103,7 +106,8 @@ export function SignsGallery() {
 
         (async () => {
             try {
-                const res = await fetch('/api/signs', { signal: controller.signal });
+                const endpoint = activeModel === 'lstm' ? '/api/temporal/signs' : '/api/signs';
+                const res = await fetch(endpoint, { signal: controller.signal });
                 const data = await res.json() as { signs?: Sign[] };
                 setSigns(Array.isArray(data.signs) ? data.signs : []);
             } catch (err) {
@@ -116,7 +120,13 @@ export function SignsGallery() {
         })();
 
         return () => controller.abort();
-    }, []);
+    }, [activeModel]);
+
+    useEffect(() => {
+        if (activeModel === 'lstm') {
+            setOnlyWithGif(false);
+        }
+    }, [activeModel]);
 
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -141,7 +151,7 @@ export function SignsGallery() {
             ? signs.filter((s) => s.class.startsWith('CUSTOM_'))
             : signs;
 
-        const scoped = onlyWithGif
+        const scoped = activeModel === 'mlp' && onlyWithGif
             ? base.filter((s) => Boolean(s.gif_url))
             : base;
 
@@ -164,7 +174,7 @@ export function SignsGallery() {
         });
 
         return ranked;
-    }, [onlyNew, onlyWithGif, signs, tokens]);
+    }, [activeModel, onlyNew, onlyWithGif, signs, tokens]);
 
     const shownCountLabel = loading
         ? 'Loading signs…'
@@ -234,22 +244,24 @@ export function SignsGallery() {
                                 </span>
                             </button>
 
-                            <button
-                                type="button"
-                                onClick={() => setOnlyWithGif((v) => !v)}
-                                className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left text-[0.88rem] font-bold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_22px_rgba(15,34,68,0.08)] ${onlyWithGif
-                                    ? 'border-[#bfdbff] bg-[#edf5ff] text-brand'
-                                    : 'border-border-color bg-white text-text hover:border-[#b8d4ff]'
-                                    }`}
-                            >
-                                <span className="flex items-center gap-2">
-                                    <Image size={16} />
-                                    Only signs with GIFs
-                                </span>
-                                <span className={`rounded-full px-2 py-0.5 text-[0.68rem] font-extrabold uppercase tracking-[0.14em] ${onlyWithGif ? 'bg-white/60' : 'bg-[#edf5ff] text-brand'}`}>
-                                    {onlyWithGif ? 'ON' : 'OFF'}
-                                </span>
-                            </button>
+                            {activeModel === 'mlp' && (
+                                <button
+                                    type="button"
+                                    onClick={() => setOnlyWithGif((v) => !v)}
+                                    className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left text-[0.88rem] font-bold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_22px_rgba(15,34,68,0.08)] ${onlyWithGif
+                                        ? 'border-[#bfdbff] bg-[#edf5ff] text-brand'
+                                        : 'border-border-color bg-white text-text hover:border-[#b8d4ff]'
+                                        }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <Image size={16} />
+                                        Only signs with GIFs
+                                    </span>
+                                    <span className={`rounded-full px-2 py-0.5 text-[0.68rem] font-extrabold uppercase tracking-[0.14em] ${onlyWithGif ? 'bg-white/60' : 'bg-[#edf5ff] text-brand'}`}>
+                                        {onlyWithGif ? 'ON' : 'OFF'}
+                                    </span>
+                                </button>
+                            )}
                         </div>
 
                         <div className="rounded-2xl border border-border-color bg-[#f9fbff] p-4">
@@ -330,7 +342,7 @@ export function SignsGallery() {
                                             style={{ contentVisibility: 'auto', containIntrinsicSize: '280px 280px' }}
                                         >
                                             <div className="absolute inset-0">
-                                                {sign.gif_url ? (
+                                                {activeModel === 'mlp' && sign.gif_url ? (
                                                     <img
                                                         src={sign.gif_url}
                                                         alt={sign.word}
@@ -341,7 +353,7 @@ export function SignsGallery() {
                                                 ) : (
                                                     <div className="relative grid h-full w-full place-items-center bg-[radial-gradient(circle_at_30%_30%,rgba(0,127,255,0.22),transparent_56%),radial-gradient(circle_at_70%_70%,rgba(255,127,64,0.18),transparent_60%),linear-gradient(160deg,#f8fbff_0%,#eaf2ff_100%)]">
                                                         <div className="text-[3rem] text-[#93b7e6] [text-shadow:0_10px_18px_rgba(0,127,255,0.18)]">
-                                                            &#9995;
+                                                            {activeModel === 'lstm' ? 'LSTM' : '✋'}
                                                         </div>
                                                     </div>
                                                 )}
@@ -373,9 +385,11 @@ export function SignsGallery() {
                                                     <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-white/90 backdrop-blur">
                                                         {bestField === 'class' ? 'Class match' : 'Word match'}
                                                     </span>
-                                                    <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-white/90 backdrop-blur">
-                                                        {sign.gif_url ? 'GIF' : 'NO GIF'}
-                                                    </span>
+                                                    {activeModel === 'mlp' && (
+                                                        <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-[0.14em] text-white/90 backdrop-blur">
+                                                            {sign.gif_url ? 'GIF' : 'NO GIF'}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </article>

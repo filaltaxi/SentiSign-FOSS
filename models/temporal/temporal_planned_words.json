@@ -1,0 +1,180 @@
+{
+  "categories": [
+    {
+      "name": "Basic_Responses",
+      "words": [
+        "FINE",
+        "FINISH",
+        "FORGET",
+        "GO",
+        "HELLO",
+        "HELP",
+        "DONT_WANT",
+        "LIKE",
+        "MORE",
+        "NEED",
+        "WRONG",
+        "NO",
+        "NOT",
+        "PLEASE",
+        "RIGHT",
+        "THANK_YOU",
+        "WANT",
+        "YES"
+      ]
+    },
+    {
+      "name": "Places",
+      "words": [
+        "BATHROOM",
+        "CAR",
+        "HOME",
+        "KITCHEN",
+        "LIVING_ROOM",
+        "PHONE"
+      ]
+    },
+    {
+      "name": "Food_Drink",
+      "words": [
+        "CHEESE",
+        "COOK",
+        "COOKIES",
+        "DRINK",
+        "EAT",
+        "HAMBURGER",
+        "MILK",
+        "SANDWICH"
+      ]
+    },
+    {
+      "name": "Pronouns",
+      "words": [
+        "ME",
+        "MINE",
+        "YOU",
+        "YOUR"
+      ]
+    },
+    {
+      "name": "People",
+      "words": [
+        "BOY",
+        "GIRL",
+        "MAN",
+        "WOMAN",
+        "DEAF",
+        "HEARING"
+      ]
+    },
+    {
+      "name": "Questions",
+      "words": [
+        "HOW",
+        "WHAT",
+        "WHEN",
+        "WHERE",
+        "WHO",
+        "WHY"
+      ]
+    },
+    {
+      "name": "Education",
+      "words": [
+        "ASL",
+        "BOOK",
+        "CLASS",
+        "KNOW",
+        "LEARN",
+        "SENTENCE",
+        "SIGN",
+        "STUDENT",
+        "TEACHER"
+      ]
+    },
+    {
+      "name": "Time",
+      "words": [
+        "AFTERNOON",
+        "DAY",
+        "HOUR",
+        "MINUTE",
+        "MONTH",
+        "MORNING",
+        "NIGHT",
+        "NOON",
+        "TIME",
+        "WEEK",
+        "YEAR"
+      ]
+    },
+    {
+      "name": "Family",
+      "words": [
+        "BABY",
+        "BROTHER",
+        "CHILDREN",
+        "FAMILY",
+        "FATHER",
+        "GRANDFATHER",
+        "GRANDMOTHER",
+        "HUSBAND",
+        "MOTHER",
+        "SISTER",
+        "WIFE"
+      ]
+    },
+    {
+      "name": "Animals",
+      "words": [
+        "DOG",
+        "CAT"
+      ]
+    },
+    {
+      "name": "Colors",
+      "words": [
+        "BLUE",
+        "GREEN",
+        "ORANGE",
+        "PINK",
+        "PURPLE",
+        "RED",
+        "YELLOW"
+      ]
+    },
+    {
+      "name": "Emotions",
+      "words": [
+        "SO_SO",
+        "GOOD",
+        "HAPPY",
+        "SAD",
+        "BAD"
+      ]
+    },
+    {
+      "name": "Actions",
+      "words": [
+        "CHAT",
+        "SIGNING",
+        "LOOK",
+        "PAY_ATTENTION"
+      ]
+    },
+    {
+      "name": "Negation",
+      "words": [
+        "DONT",
+        "NOT_YET"
+      ]
+    },
+    {
+      "name": "Greetings",
+      "words": [
+        "BYE",
+        "LOVE"
+      ]
+    }
+  ]
+}

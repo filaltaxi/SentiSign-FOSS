@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { EmotionType } from './EmotionStrip';
+import type { SignModel } from '../model/ModelContext';
+import { extractTemporalFeatures, hasTemporalSignal } from '../lib/handFeatures';
 
 interface WebcamPaneProps {
+    model: SignModel;
     isActive: boolean;
     onEmotionDetected: (emotion: EmotionType) => void;
     onSignDetected: (word: string | null, cls: string | null, confidence: number) => void;
@@ -23,8 +26,12 @@ declare global {
 }
 
 const RECOGNISE_DELAY = 80;
+const LSTM_N_FRAMES = 60;
+const LSTM_STRIDE = 5;
+const LSTM_MIN_CONFIDENCE = 0.6;
 
 export function WebcamPane({
+    model,
     isActive,
     onEmotionDetected,
     onSignDetected,
@@ -53,11 +60,19 @@ export function WebcamPane({
         hands: any | null;
         emotionInterval: ReturnType<typeof setInterval> | null;
         lastRecogniseTime: number;
+        frameBuffer: number[][];
+        frameCounter: number;
+        inputCanvas: HTMLCanvasElement | null;
+        inputCtx: CanvasRenderingContext2D | null;
     }>({
         camera: null,
         hands: null,
         emotionInterval: null,
         lastRecogniseTime: 0,
+        frameBuffer: [],
+        frameCounter: 0,
+        inputCanvas: null,
+        inputCtx: null,
     });
 
     const onHandResults = useCallback(async (results: any) => {
@@ -72,25 +87,20 @@ export function WebcamPane({
         canvas.height = videoEl.videoHeight || 480;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-            onSignDetectedRef.current(null, null, 0);
-            return;
-        }
-
         // Draw
-        for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+        const handLandmarks = results.multiHandLandmarks ?? [];
+        for (let i = 0; i < handLandmarks.length; i++) {
             const lm = results.multiHandLandmarks[i];
-            let isPhysicalRight;
-            if (results.multiHandLandmarks.length >= 2) {
-                const w0 = results.multiHandLandmarks[0][0].x;
-                const w1 = results.multiHandLandmarks[1][0].x;
-                isPhysicalRight = i === (w0 > w1 ? 0 : 1);
-            } else {
-                const label = results.multiHandedness?.[i]?.classification?.[0]?.label ?? 'Left';
-                isPhysicalRight = label === 'Left';
-            }
+            const label = results.multiHandedness?.[i]?.classification?.[0]?.label ?? 'Left';
+            const isRight = label === 'Right';
+            const color = isRight ? '#007FFF' : '#FF7F40';
+            const mirrorOverlay = model === 'mlp';
 
-            const color = isPhysicalRight ? '#007FFF' : '#FF7F40';
+            if (mirrorOverlay) {
+                ctx.save();
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+            }
 
             window.drawConnectors(ctx, lm, window.HAND_CONNECTIONS, { color: color + '55', lineWidth: 2 });
             window.drawLandmarks(ctx, lm, { color, lineWidth: 1, radius: 3 });
@@ -105,49 +115,71 @@ export function WebcamPane({
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+
+            if (mirrorOverlay) {
+                ctx.restore();
+            }
+
+            const labelX = mirrorOverlay ? canvas.width - x2 : x1;
             ctx.fillStyle = color;
             ctx.font = '13px "Manrope"';
-            ctx.fillText(isPhysicalRight ? 'L' : 'R', x1 + 4, y1 - 4);
+            ctx.fillText(isRight ? 'R' : 'L', labelX + 4, y1 - 4);
         }
 
-        // Build features
-        const right = new Array(63).fill(0);
-        const left = new Array(63).fill(0);
+        const features = extractTemporalFeatures(results);
+        const hasSignal = hasTemporalSignal(features);
 
-        if (results.multiHandLandmarks.length === 1) {
-            const label = results.multiHandedness?.[0]?.classification?.[0]?.label ?? 'Left';
-            const flat = results.multiHandLandmarks[0].flatMap((p: any) => [p.x, p.y, p.z]);
-            if (label === 'Right') flat.forEach((v: number, j: number) => right[j] = v);
-            else flat.forEach((v: number, j: number) => left[j] = v);
-        } else {
-            const w0 = results.multiHandLandmarks[0][0].x;
-            const w1 = results.multiHandLandmarks[1][0].x;
-            const rIdx = w0 > w1 ? 0 : 1;
-            const lIdx = w0 > w1 ? 1 : 0;
-            results.multiHandLandmarks[rIdx].flatMap((p: any) => [p.x, p.y, p.z]).forEach((v: number, j: number) => right[j] = v);
-            results.multiHandLandmarks[lIdx].flatMap((p: any) => [p.x, p.y, p.z]).forEach((v: number, j: number) => left[j] = v);
-        }
-        const features = [...right, ...left];
+        if (model === 'mlp') {
+            if (!hasSignal) {
+                onSignDetectedRef.current(null, null, 0);
+                return;
+            }
+            const now = Date.now();
+            if (now - mpRef.current.lastRecogniseTime < RECOGNISE_DELAY) return;
+            mpRef.current.lastRecogniseTime = now;
 
-        // Throttle API calls
-        const now = Date.now();
-        if (now - mpRef.current.lastRecogniseTime < RECOGNISE_DELAY) {
+            try {
+                const res = await fetch('/api/recognise', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ landmarks: features })
+                });
+                const data = await res.json();
+                onSignDetectedRef.current(data.word, data.class, data.confidence);
+            } catch (err) {
+                console.error('Recognise API failed', err);
+            }
             return;
         }
-        mpRef.current.lastRecogniseTime = now;
+
+        mpRef.current.frameBuffer.push(features);
+        if (mpRef.current.frameBuffer.length > LSTM_N_FRAMES) {
+            mpRef.current.frameBuffer.shift();
+        }
+        mpRef.current.frameCounter += 1;
+
+        if (mpRef.current.frameBuffer.length < LSTM_N_FRAMES) {
+            onSignDetectedRef.current(null, null, 0);
+            return;
+        }
+        if (mpRef.current.frameCounter % LSTM_STRIDE !== 0) return;
 
         try {
-            const res = await fetch('/api/recognise', {
+            const res = await fetch('/api/temporal/recognise', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ landmarks: features })
+                body: JSON.stringify({ sequence: mpRef.current.frameBuffer })
             });
             const data = await res.json();
-            onSignDetectedRef.current(data.word, data.class, data.confidence);
+            if (Number(data.confidence) >= LSTM_MIN_CONFIDENCE) {
+                onSignDetectedRef.current(data.word, data.class, data.confidence);
+            } else {
+                onSignDetectedRef.current(null, null, 0);
+            }
         } catch (err) {
-            console.error("Recognise API failed", err);
+            console.error('Temporal recognise API failed', err);
         }
-    }, []);
+    }, [model]);
 
     // Lifecycle for Camera / Session
     useEffect(() => {
@@ -157,6 +189,10 @@ export function WebcamPane({
             const resetEmotion = opts?.resetEmotion ?? true;
 
             mpRef.current.lastRecogniseTime = 0;
+            mpRef.current.frameBuffer = [];
+            mpRef.current.frameCounter = 0;
+            mpRef.current.inputCanvas = null;
+            mpRef.current.inputCtx = null;
 
             if (mpRef.current.emotionInterval) {
                 clearInterval(mpRef.current.emotionInterval);
@@ -206,16 +242,23 @@ export function WebcamPane({
                 // Clean slate if a previous session wasn't fully torn down.
                 stopSession({ resetEmotion: false });
                 mpRef.current.lastRecogniseTime = 0;
+                mpRef.current.frameBuffer = [];
+                mpRef.current.frameCounter = 0;
 
                 const handsDetector = new window.Hands({
                     locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`
                 });
 
+                const inputCanvas = document.createElement('canvas');
+                const inputCtx = inputCanvas.getContext('2d');
+                mpRef.current.inputCanvas = inputCanvas;
+                mpRef.current.inputCtx = inputCtx;
+
                 handsDetector.setOptions({
                     maxNumHands: 2,
                     modelComplexity: 1,
-                    minDetectionConfidence: 0.7,
-                    minTrackingConfidence: 0.6,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5,
                 });
 
                 handsDetector.onResults(onHandResults);
@@ -225,7 +268,28 @@ export function WebcamPane({
                     onFrame: async () => {
                         if (ignore) return;
                         if (mpRef.current.hands && videoEl) {
-                            await mpRef.current.hands.send({ image: videoEl });
+                            if (model === 'mlp') {
+                                await mpRef.current.hands.send({ image: videoEl });
+                                return;
+                            }
+
+                            const w = videoEl.videoWidth;
+                            const h = videoEl.videoHeight;
+                            const ctx = mpRef.current.inputCtx;
+                            const canvas = mpRef.current.inputCanvas;
+                            if (ctx && canvas && w && h) {
+                                if (canvas.width !== w) canvas.width = w;
+                                if (canvas.height !== h) canvas.height = h;
+                                ctx.save();
+                                ctx.clearRect(0, 0, w, h);
+                                ctx.translate(w, 0);
+                                ctx.scale(-1, 1);
+                                ctx.drawImage(videoEl, 0, 0, w, h);
+                                ctx.restore();
+                                await mpRef.current.hands.send({ image: canvas });
+                            } else {
+                                await mpRef.current.hands.send({ image: videoEl });
+                            }
                         }
                     },
                     width: 640,
@@ -299,7 +363,7 @@ export function WebcamPane({
                 />
                 <canvas
                     ref={canvasRef}
-                    className="pointer-events-none absolute inset-0 h-full w-full scale-x-[-1]"
+                    className="pointer-events-none absolute inset-0 h-full w-full"
                 />
                 <div className={`pointer-events-none absolute inset-0 border transition-all duration-500 ${isActive ? 'camera-live-pulse border-[rgba(71,158,255,0.72)]' : 'border-transparent'}`} />
 

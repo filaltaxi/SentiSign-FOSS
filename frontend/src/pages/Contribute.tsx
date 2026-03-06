@@ -5,6 +5,8 @@ import { Gate2Gesture } from '../components/Gate2Gesture';
 import { Gate3Record } from '../components/Gate3Record';
 import { Gate4Success } from '../components/Gate4Success';
 import { AnimatePresence } from 'framer-motion';
+import { useModel } from '../model/ModelContext';
+import { ContributeLSTM } from './ContributeLSTM';
 
 const STEPS = [
     { num: 1, label: 'Word Check' },
@@ -14,6 +16,7 @@ const STEPS = [
 ];
 
 export function Contribute() {
+    const { model } = useModel();
     const [currentStep, setCurrentStep] = useState(1);
     const [targetWord, setTargetWord] = useState('');
 
@@ -47,7 +50,7 @@ export function Contribute() {
                 })
             });
             const data = await res.json();
-            if (res.ok && data.status === 'success') {
+            if (res.ok && (data.status === 'success' || data.success === true)) {
                 setCurrentStep(4);
             } else {
                 throw new Error(data.detail || 'Submission failed');
@@ -61,6 +64,10 @@ export function Contribute() {
         setTargetWord('');
         setCurrentStep(1);
     };
+
+    if ((model ?? 'mlp') === 'lstm') {
+        return <ContributeLSTM />;
+    }
 
     return (
         <div className="h-[calc(100dvh-var(--app-nav-h))] overflow-y-auto">

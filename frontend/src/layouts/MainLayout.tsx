@@ -1,9 +1,11 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'framer-motion';
+import { useModel } from '../model/ModelContext';
 
 export function MainLayout() {
     const location = useLocation();
     const prefersReducedMotion = useReducedMotion();
+    const { model, availableModels, setModel } = useModel();
 
     const pillTransition = prefersReducedMotion
         ? { duration: 0 }
@@ -21,6 +23,7 @@ export function MainLayout() {
                     </div>
 
                     <LayoutGroup id="top-nav">
+                        <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1 rounded-full border border-border-color bg-white/90 p-1 shadow-[0_8px_22px_rgba(15,34,68,0.08)]">
                         <NavLink
                             to="/"
@@ -98,6 +101,25 @@ export function MainLayout() {
                                 </>
                             )}
                         </NavLink>
+                        </div>
+
+                        <div className="flex items-center gap-1 rounded-full border border-border-color bg-white/90 p-1 shadow-[0_8px_22px_rgba(15,34,68,0.08)]">
+                            <button
+                                type="button"
+                                onClick={() => setModel('mlp')}
+                                className={`h-8 rounded-full px-3 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] transition-colors ${model === 'mlp' ? 'bg-[#edf5ff] text-brand' : 'text-muted hover:bg-[#f2f7ff] hover:text-text'}`}
+                            >
+                                MLP
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setModel('lstm')}
+                                className={`h-8 rounded-full px-3 text-[0.72rem] font-extrabold uppercase tracking-[0.12em] transition-colors ${model === 'lstm' ? 'bg-[#fff1e8] text-[#c85a21]' : 'text-muted hover:bg-[#fdf3ed] hover:text-text'}`}
+                                title={availableModels.lstm ? 'Temporal LSTM' : 'Temporal LSTM (train required)'}
+                            >
+                                LSTM
+                            </button>
+                        </div>
                         </div>
                     </LayoutGroup>
                 </div>

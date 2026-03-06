@@ -80,6 +80,17 @@ python train_landmark_classifier.py
 ```
 Takes under 2 minutes on GPU.
 
+**7 — Inspect the shared temporal dataset**
+```bash
+uv run python inspect_temporal_dataset.py
+```
+
+**8 — Collect / retrain temporal signs**
+```bash
+uv run python collect_asl.py
+uv run python train_temporal.py --data data/temporal/asl_dataset --out models/temporal
+```
+
 ---
 
 ## Running
@@ -118,7 +129,10 @@ SentiSign-OMAR/
 │
 ├── main.py                         # FastAPI backend
 ├── collect_landmarks.py            # Training data collection
+├── collect_asl.py                  # Temporal sign collection
+├── inspect_temporal_dataset.py     # Temporal dataset vs checkpoint summary
 ├── train_landmark_classifier.py    # MLP + RF training
+├── train_temporal.py               # Temporal TCN + BiLSTM + Attention training
 ├── requirements.txt
 ├── pyproject.toml                  # uv support
 │
@@ -147,10 +161,12 @@ SentiSign-OMAR/
 │   └── src/                        # Sentence generation
 │
 └── data/
-    └── landmarks/
-        ├── raw/                    # Per-class CSV files (not in repo)
-        ├── references/             # Reference GIFs per sign
-        └── plots/                  # Training evaluation plots
+    ├── landmarks/
+    │   ├── raw/                    # Per-class CSV files (not in repo)
+    │   ├── references/             # Reference GIFs per sign
+    │   └── plots/                  # Training evaluation plots
+    └── temporal/
+        └── asl_dataset/            # Canonical shared temporal dataset (.npy reps, committed)
 ```
 
 ---
@@ -217,6 +233,31 @@ New signs can be added via the web interface at `/contribute`:
 **Recording:** Collect 100–200 samples. Reference GIF captured automatically.
 
 **Retraining:** Full MLP retrain triggers automatically in background (~45 seconds on GPU). Model reloads into memory without server restart.
+
+---
+
+## Temporal Dataset Collaboration
+
+The temporal LSTM workflow is now set up around a canonical shared dataset:
+
+- Raw temporal reps live in `data/temporal/asl_dataset/<WORD>/sample_###.npy`
+- Those `.npy` files are committed to Git
+- `train_temporal.py` always retrains from the full dataset folder, not just from the last checkpoint
+- `models/temporal/temporal_lstm.pth` and `models/temporal/temporal_label_map.json` should be committed after retraining
+
+Recommended team workflow:
+
+1. Pull latest changes before recording or training.
+2. Run `uv run python inspect_temporal_dataset.py` to see what words and rep counts already exist.
+3. Add new reps with `uv run python collect_asl.py`.
+4. Commit the new `.npy` files first if needed, or retrain immediately from the merged dataset.
+5. Retrain with `uv run python train_temporal.py --data data/temporal/asl_dataset --out models/temporal`.
+6. Commit the updated dataset and temporal model files together.
+
+Important rule:
+
+- If two people changed the temporal dataset in parallel, merge the dataset changes first, then retrain once from the merged dataset, then commit the new checkpoint.
+- Do not try to manually resolve binary checkpoint conflicts by hand.
 
 ---
 

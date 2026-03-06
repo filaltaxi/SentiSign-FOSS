@@ -5,6 +5,7 @@ import { SignsGallery } from './pages/SignsGallery'
 import { Contribute } from './pages/Contribute'
 import { About } from './pages/About'
 import { BackendGate } from './components/BackendGate'
+import { ModelProvider } from './model/ModelContext'
 
 const router = createBrowserRouter([
   {
@@ -34,7 +35,9 @@ const router = createBrowserRouter([
 function App() {
   return (
     <BackendGate>
-      <RouterProvider router={router} />
+      <ModelProvider>
+        <RouterProvider router={router} />
+      </ModelProvider>
     </BackendGate>
   )
 }

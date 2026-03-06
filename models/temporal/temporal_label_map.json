@@ -1,0 +1,17 @@
+{
+  "classes": [
+    "MORE",
+    "PHONE"
+  ],
+  "label_to_idx": {
+    "MORE": 0,
+    "PHONE": 1
+  },
+  "idx_to_label": {
+    "0": "MORE",
+    "1": "PHONE"
+  },
+  "input_dim": 126,
+  "n_frames": 60,
+  "model_type": "tcn_bilstm_attention"
+}

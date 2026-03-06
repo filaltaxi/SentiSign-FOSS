@@ -6,11 +6,14 @@ import { SentenceOutput } from '../components/SentenceOutput';
 import type { EmotionType } from '../components/EmotionStrip';
 import { generateSentence, generateAudio, type TtsProvider } from '../lib/api.ts';
 import { Play, Square, RotateCcw, XCircle } from 'lucide-react';
+import { useModel } from '../model/ModelContext';
 
 const HOLD_FRAMES = 10;
 const MIN_CONFIDENCE = 0.60;
 
 export const Communicate: React.FC = () => {
+    const { model, sessionResetNonce } = useModel();
+    const activeModel = model ?? 'mlp';
     const [wordBuffer, setWordBuffer] = useState<string[]>([]);
     const [sentence, setSentence] = useState<string>('');
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -99,7 +102,7 @@ export const Communicate: React.FC = () => {
         setWordBuffer((prev) => prev.slice(0, -1));
     };
 
-    const clearWords = () => {
+    const clearWords = useCallback(() => {
         cancelGeneration();
         setWordBuffer([]);
         setSentence('');
@@ -110,7 +113,13 @@ export const Communicate: React.FC = () => {
         trackingRef.current.holdCounter = 0;
         trackingRef.current.currentClass = null;
         trackingRef.current.lastWord = '';
-    };
+    }, [cancelGeneration]);
+
+    useEffect(() => {
+        if (sessionResetNonce === 0) return;
+        setSessionActive(false);
+        clearWords();
+    }, [clearWords, sessionResetNonce]);
 
     const handleGenerateAndSpeak = async () => {
         if (wordBuffer.length === 0) return;
@@ -180,6 +189,7 @@ export const Communicate: React.FC = () => {
 
                 <div className={`mx-auto w-full max-w-[560px] overflow-hidden rounded-2xl border bg-[#eaf2ff] transition-all duration-400 md:max-w-[620px] xl:max-w-[660px] ${sessionActive ? 'border-[#9fc9ff] shadow-[0_18px_34px_rgba(0,127,255,0.18)]' : 'border-[#c9defd]'}`}>
                     <WebcamPane
+                        model={activeModel}
                         isActive={sessionActive}
                         onEmotionDetected={setDetectedEmotion}
                         onSignDetected={handleSignDetected}
