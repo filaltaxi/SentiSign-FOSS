@@ -15,7 +15,7 @@ SentiSign translates ASL hand signs and facial emotion into natural, emotionally
 | 3 | MLP classifier maps landmarks to vocabulary words |
 | 4 | ResNet CNN detects facial emotion simultaneously |
 | 5 | Ollama `qwen3.5:0.8b` generates a grammatical sentence from word buffer |
-| 6 | Chatterbox (local) or ElevenLabs (cloud) synthesises speech |
+| 6 | Chatterbox synthesises speech locally |
 
 ---
 
@@ -50,11 +50,11 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-**3.1 — Configure TTS provider (optional)**
+**3.1 — Configure local environment (optional)**
 ```bash
 cp .env.example .env
 ```
-Set `ELEVENLABS_API_KEY` if you want ElevenLabs. You can switch provider in the web UI (`Voice Engine`) or desktop pipeline prompt.
+This is only needed if you want to override the default local Ollama sentence-model settings.
 
 **Alternative: install + run with `uv`**
 ```bash
@@ -151,7 +151,7 @@ SentiSign-OMAR/
 ├── src/
 │   ├── sign_recognizer.py          # Desktop pipeline (terminal)
 │   ├── emotion_detector.py         # ResNet FER
-│   ├── tts.py                      # Multi-provider TTS (Chatterbox + ElevenLabs)
+│   ├── tts.py                      # Chatterbox TTS
 │   └── emotion_map.py              # Emotion → prosody parameters
 │
 ├── frontend/
@@ -228,7 +228,7 @@ SentiSign-OMAR/
 - **Output:** grammatical sentence (`"I need help."`)
 
 ### Speech Synthesis
-- **Providers:** Chatterbox-TTS (local), ElevenLabs (`eleven_flash_v2_5`)
+- **TTS engine:** Chatterbox-TTS (local)
 - **Emotion profiles:** 7 (one per emotion class)
 - **Parameters tuned:** exaggeration, CFG weight
 
@@ -296,7 +296,6 @@ The gap in the standard approach is caused by distribution mismatch between stud
 | mediapipe | 0.10.9 | Last stable version before breaking API change |
 | onnx | 1.14.1 | protobuf 3.x compatibility |
 | protobuf | 3.20.3 | mediapipe requirement |
-| elevenlabs | latest | Cloud TTS provider (`eleven_flash_v2_5`) |
 
 ---
 

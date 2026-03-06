@@ -4,7 +4,7 @@ import { WordBuffer } from '../components/WordBuffer';
 import { EmotionStrip } from '../components/EmotionStrip';
 import { SentenceOutput } from '../components/SentenceOutput';
 import type { EmotionType } from '../components/EmotionStrip';
-import { generateSentence, generateAudio, type TtsProvider } from '../lib/api.ts';
+import { generateSentence, generateAudio } from '../lib/api.ts';
 import { Play, Square, RotateCcw, XCircle } from 'lucide-react';
 import { useModel } from '../model/ModelContext';
 
@@ -20,7 +20,6 @@ export const Communicate: React.FC = () => {
     const [audioFilename, setAudioFilename] = useState<string | null>(null);
     const [generationStage, setGenerationStage] = useState<'idle' | 'sentence' | 'audio'>('idle');
     const [sessionActive, setSessionActive] = useState<boolean>(false);
-    const [ttsProvider, setTtsProvider] = useState<TtsProvider>('chatterbox');
     const [detectedEmotion, setDetectedEmotion] = useState<EmotionType>('neutral');
     const [emotionOverride, setEmotionOverride] = useState<EmotionType | null>(null);
     const [signLabel, setSignLabel] = useState<string>('No sign detected');
@@ -140,7 +139,6 @@ export const Communicate: React.FC = () => {
         try {
             const data = await generateSentence(wordBuffer, selectedEmotion, {
                 signal: abortController.signal,
-                ttsProvider,
             });
             if (generationRunIdRef.current !== runId) return;
 
@@ -149,7 +147,6 @@ export const Communicate: React.FC = () => {
                 setGenerationStage('audio');
                 const audioData = await generateAudio(data.sentence, selectedEmotion, {
                     signal: abortController.signal,
-                    ttsProvider,
                 });
                 if (generationRunIdRef.current !== runId) return;
 
@@ -270,24 +267,6 @@ export const Communicate: React.FC = () => {
                                 <>&#10022; Generate &amp; Speak</>
                             )}
                         </button>
-                    </div>
-
-                    <div className="rounded-2xl border border-border-color bg-[#f9fbff] p-3">
-                        <h3 className="mb-2.5 font-heading text-[0.7rem] font-bold uppercase tracking-[0.18em] text-muted">Voice Engine</h3>
-                        <label className="mb-2 block text-[0.74rem] font-semibold uppercase tracking-[0.12em] text-muted">
-                            Provider
-                        </label>
-                        <select
-                            value={ttsProvider}
-                            onChange={(event) => setTtsProvider(event.target.value as TtsProvider)}
-                            className="h-10 w-full rounded-xl border border-border-color bg-white px-3 text-[0.82rem] font-semibold text-text outline-none transition-colors focus:border-brand"
-                        >
-                            <option value="chatterbox">Chatterbox (local)</option>
-                            <option value="elevenlabs">ElevenLabs (cloud)</option>
-                        </select>
-                        <p className="mt-2 text-[0.72rem] text-muted">
-                            ElevenLabs uses model <span className="font-semibold text-text">eleven_flash_v2_5</span>.
-                        </p>
                     </div>
 
                     <div className="rounded-2xl border border-border-color bg-[#f9fbff] p-3">

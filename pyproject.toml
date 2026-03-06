@@ -7,7 +7,6 @@ requires-python = ">=3.10,<3.11"
 dependencies = [
   "accelerate",
   "chatterbox-tts",
-  "elevenlabs",
   "fastapi",
   "python-dotenv",
   "mediapipe==0.10.9",

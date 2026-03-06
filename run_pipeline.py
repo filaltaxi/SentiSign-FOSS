@@ -37,14 +37,14 @@ for p in [_SRC, _SLM_SRC]:
 from emotion_map       import print_emotion_table
 from generate_sentence import words_to_sentence
 from sentence_model    import get_backend_label
-from tts               import get_output_extension, resolve_provider, speak_and_save
+from tts               import get_output_extension, speak_and_save
 from sign_recognizer   import capture_words_and_emotion
 
 
 # ── Input parsing ─────────────────────────────────────────────────────────────
 
 
-def get_inputs() -> tuple:
+def get_inputs() -> tuple[list[str], str]:
     print("\n" + "═" * 64)
     print("  SentiSign  |  Sign Language → Emotion-Aware Speech")
     print(f"  Models: {get_backend_label()}  +  Chatterbox-TTS  +  ResNet Emotion")
@@ -56,19 +56,13 @@ def get_inputs() -> tuple:
     print("  GREEN box = hand recognition   BLUE box = face emotion")
     input("  Press ENTER here to open the webcam > ")
     words, emotion = capture_words_and_emotion()
-
-    configured_provider = os.environ.get("SENTISIGN_TTS_PROVIDER", "chatterbox")
-    provider_input = input(
-        f"\n  TTS provider [chatterbox/elevenlabs] (default: {configured_provider}) > "
-    ).strip()
-    provider = resolve_provider(provider_input or configured_provider)
-    return words, emotion, provider
+    return words, emotion
 
 
 # ── Pipeline run ──────────────────────────────────────────────────────────────
 
 def run():
-    words, emotion, provider = get_inputs()
+    words, emotion = get_inputs()
 
     # Step 1 — sentence generation
     print("\n" + "─" * 64)
@@ -78,15 +72,15 @@ def run():
 
     # Step 2 — TTS with emotion
     print("\n" + "─" * 64)
-    print(f"  [2/2]  Synthesising speech  (emotion: {emotion}, provider: {provider}) ...")
+    print(f"  [2/2]  Synthesising speech  (emotion: {emotion}, engine: Chatterbox) ...")
 
     from datetime import datetime
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ext = get_output_extension(provider)
-    fname = f"sentisign_{emotion}_{provider}_{timestamp}.{ext}"
+    ext = get_output_extension()
+    fname = f"sentisign_{emotion}_{timestamp}.{ext}"
     path  = os.path.join(OUTPUT_DIR, fname)
     print(f"\n  Auto-saving audio as: {fname}")
-    speak_and_save(sentence, emotion=emotion, path=path, also_play=True, provider=provider)
+    speak_and_save(sentence, emotion=emotion, path=path, also_play=True)
     print(f"\n  ✓  Saved: {path}")
 
     # Summary
@@ -95,7 +89,7 @@ def run():
     print(f"  Words    : {words}")
     print(f"  Sentence : \"{sentence}\"")
     print(f"  Emotion  : {emotion}")
-    print(f"  Provider : {provider}")
+    print("  Engine   : Chatterbox")
     print("═" * 64)
 
 

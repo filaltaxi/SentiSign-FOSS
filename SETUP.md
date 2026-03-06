@@ -1,5 +1,5 @@
 # SentiSign — Setup & Run Guide
-## Stack: Ollama qwen3.5:0.8b + Chatterbox/ElevenLabs TTS | Python 3.10 | Windows
+## Stack: Ollama qwen3.5:0.8b + Chatterbox TTS | Python 3.10 | Windows
 
 ---
 
@@ -32,7 +32,7 @@ SentiSign-OMAR/
 ├── requirements.txt         ← all dependencies
 │
 ├── src/                     ← TTS + emotion modules
-│   ├── tts.py               ← TTS wrapper (Chatterbox + ElevenLabs)
+│   ├── tts.py               ← Chatterbox TTS wrapper
 │   ├── emotion_map.py       ← emotion → exaggeration + cfg_weight
 │   └── play_audio.py        ← sounddevice playback, .wav saving
 │
@@ -77,12 +77,6 @@ pip install -r requirements.txt
 > `chatterbox-tts` pulls in torch + torchaudio automatically.
 > No SOX. No espeak-ng. No system tools needed on Windows.
 
-If you plan to use ElevenLabs:
-```bat
-copy .env.example .env
-```
-Set `ELEVENLABS_API_KEY` in `.env`.
-
 ---
 
 ## Step 3 — Install the Ollama sentence model
@@ -106,7 +100,6 @@ python slm\download_model.py
 ```
 
 > Chatterbox model (~1GB) auto-downloads on first `run_pipeline.py` run.
-> ElevenLabs does not download local weights (cloud API).
 > `slm\download_model.py` is only needed when using `SENTISIGN_SENTENCE_PROVIDER=hf`.
 
 ---
