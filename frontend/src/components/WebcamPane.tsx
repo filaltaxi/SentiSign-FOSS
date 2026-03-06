@@ -28,7 +28,6 @@ declare global {
 const RECOGNISE_DELAY = 80;
 const LSTM_N_FRAMES = 60;
 const LSTM_STRIDE = 5;
-const LSTM_MIN_CONFIDENCE = 0.6;
 
 export function WebcamPane({
     model,
@@ -171,11 +170,10 @@ export function WebcamPane({
                 body: JSON.stringify({ sequence: mpRef.current.frameBuffer })
             });
             const data = await res.json();
-            if (Number(data.confidence) >= LSTM_MIN_CONFIDENCE) {
-                onSignDetectedRef.current(data.word, data.class, data.confidence);
-            } else {
-                onSignDetectedRef.current(null, null, 0);
-            }
+            const cls = typeof data.class === 'string' ? data.class : null;
+            const word = typeof data.word === 'string' ? data.word : null;
+            const conf = Number.isFinite(Number(data.confidence)) ? Number(data.confidence) : 0;
+            onSignDetectedRef.current(word, cls, conf);
         } catch (err) {
             console.error('Temporal recognise API failed', err);
         }
