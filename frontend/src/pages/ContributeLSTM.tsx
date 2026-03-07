@@ -397,6 +397,37 @@ export function ContributeLSTM() {
         }
     }, [saveRep]);
 
+    const stopCamera = useCallback(() => {
+        if (saveTimeoutRef.current !== null) {
+            window.clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = null;
+        }
+        if (mpRef.current.camera) {
+            try {
+                mpRef.current.camera.stop();
+            } catch { }
+            mpRef.current.camera = null;
+        }
+        if (mpRef.current.hands) {
+            try {
+                mpRef.current.hands.close();
+            } catch { }
+            mpRef.current.hands = null;
+        }
+        mpRef.current.inputCanvas = null;
+        mpRef.current.inputCtx = null;
+        if (videoRef.current?.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach((track) => track.stop());
+            videoRef.current.srcObject = null;
+        }
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (canvas && ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }, []);
+
     useEffect(() => {
         let ignore = false;
 
@@ -459,35 +490,27 @@ export function ContributeLSTM() {
             }
         }
 
+        if (trainStatus.state === 'training') {
+            setQueueActive(false);
+            setRepState('ready');
+            setCountdown(0);
+            setRecordedFrames(0);
+            repFramesRef.current = [];
+            savingRef.current = false;
+            setRecorderHint('Training in progress. Camera paused to free resources.');
+            stopCamera();
+            return () => {
+                ignore = true;
+            };
+        }
+
         void startCamera();
 
         return () => {
             ignore = true;
-            if (saveTimeoutRef.current !== null) {
-                window.clearTimeout(saveTimeoutRef.current);
-                saveTimeoutRef.current = null;
-            }
-            if (mpRef.current.camera) {
-                try {
-                    mpRef.current.camera.stop();
-                } catch { }
-                mpRef.current.camera = null;
-            }
-            if (mpRef.current.hands) {
-                try {
-                    mpRef.current.hands.close();
-                } catch { }
-                mpRef.current.hands = null;
-            }
-            mpRef.current.inputCanvas = null;
-            mpRef.current.inputCtx = null;
-            if (videoRef.current?.srcObject) {
-                const stream = videoRef.current.srcObject as MediaStream;
-                stream.getTracks().forEach((track) => track.stop());
-                videoRef.current.srcObject = null;
-            }
+            stopCamera();
         };
-    }, [onHandResults]);
+    }, [onHandResults, stopCamera, trainStatus.state]);
 
     useEffect(() => {
         if (repState !== 'countdown') return;
@@ -703,6 +726,15 @@ export function ContributeLSTM() {
                                 <div className="absolute left-3 top-3 rounded-full border border-[#d2e4ff] bg-white/95 px-3 py-1 text-[0.66rem] font-bold uppercase tracking-[0.13em] text-muted">
                                     {queueActive ? 'Auto cycle on' : 'Auto cycle off'}
                                 </div>
+                                {trainingInFlight && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/58 px-6 text-center">
+                                        <div>
+                                            <div className="text-[0.72rem] font-bold uppercase tracking-[0.16em] text-white/70">Recorder paused</div>
+                                            <div className="mt-2 text-lg font-bold text-white">Training is using the model resources.</div>
+                                            <div className="mt-1 text-[0.86rem] text-white/78">Camera and hand landmark detection will resume automatically when training finishes.</div>
+                                        </div>
+                                    </div>
+                                )}
                                 {repState === 'countdown' && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-black/45">
                                         <div className="rounded-2xl border border-white/40 bg-white/15 px-8 py-5 text-center backdrop-blur">
@@ -741,7 +773,7 @@ export function ContributeLSTM() {
                                 <button
                                     type="button"
                                     onClick={startCollection}
-                                    disabled={!selectedWord || repsCollected >= N_REPS || repState === 'saving'}
+                                    disabled={!selectedWord || repsCollected >= N_REPS || repState === 'saving' || trainingInFlight}
                                     className="flex-1 rounded-xl bg-gradient-to-r from-brand to-brand-end px-4 py-2.5 text-[0.8rem] font-bold uppercase tracking-[0.11em] text-white disabled:cursor-not-allowed disabled:opacity-45"
                                 >
                                     Start / Continue
@@ -749,7 +781,7 @@ export function ContributeLSTM() {
                                 <button
                                     type="button"
                                     onClick={pauseCollection}
-                                    disabled={repState === 'saving'}
+                                    disabled={repState === 'saving' || trainingInFlight}
                                     className="rounded-xl border border-border-color bg-white px-4 py-2.5 text-[0.8rem] font-bold uppercase tracking-[0.11em] text-muted disabled:cursor-not-allowed disabled:opacity-45"
                                 >
                                     Pause

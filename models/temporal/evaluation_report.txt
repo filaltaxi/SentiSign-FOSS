@@ -1,0 +1,44 @@
+SentiSign Custom ASL Temporal Model — Evaluation Report
+=======================================================
+Architecture   : TCN(3 blocks) + BiLSTM(256x2) + Attention
+Input          : 60 frames x 126 features
+Classes        : 27
+Train windows  : 344
+Val windows    : 61
+Top-1 Accuracy : 95.08%
+Top-5 Accuracy : 95.08%
+Best Val Acc   : 95.08%
+
+              precision    recall  f1-score   support
+
+    BATHROOM      1.000     1.000     1.000         2
+         BOY      1.000     1.000     1.000         2
+         CAR      1.000     1.000     1.000         2
+   DONT_WANT      1.000     1.000     1.000         2
+        FINE      1.000     1.000     1.000         2
+      FINISH      1.000     1.000     1.000         2
+      FORGET      1.000     1.000     1.000         3
+          GO      1.000     1.000     1.000         3
+       HELLO      1.000     1.000     1.000         2
+        HELP      1.000     1.000     1.000         2
+        HOME      0.750     1.000     0.857         3
+     KITCHEN      1.000     1.000     1.000         2
+        LIKE      1.000     0.500     0.667         2
+ LIVING_ROOM      1.000     1.000     1.000         2
+          ME      1.000     1.000     1.000         3
+        MORE      1.000     1.000     1.000         2
+        NEED      1.000     1.000     1.000         2
+          NO      0.500     1.000     0.667         2
+         NOT      1.000     1.000     1.000         2
+       PHONE      1.000     1.000     1.000         3
+      PLEASE      1.000     1.000     1.000         3
+       RIGHT      1.000     1.000     1.000         2
+   THANK_YOU      1.000     1.000     1.000         2
+        WANT      1.000     1.000     1.000         2
+       WRONG      1.000     1.000     1.000         2
+         YES      1.000     1.000     1.000         2
+         YOU      1.000     0.333     0.500         3
+
+    accuracy                          0.951        61
+   macro avg      0.972     0.957     0.951        61
+weighted avg      0.971     0.951     0.947        61

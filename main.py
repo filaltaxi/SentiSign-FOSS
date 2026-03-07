@@ -103,6 +103,7 @@ _device       = None
 _label_map    = None
 _temporal_model = None
 _temporal_meta = None
+_temporal_model_mtime = None
 _temporal_lock = threading.Lock()
 
 # Retrain state
@@ -419,16 +420,26 @@ def _temporal_save_rep(word: str, frames: np.ndarray) -> int:
 
 
 def load_temporal():
-    global _temporal_model, _temporal_meta
-    if _temporal_model is not None and _temporal_meta is not None:
-        return _temporal_model, _temporal_meta
-
     if not os.path.exists(TEMPORAL_MODEL_PATH):
         raise FileNotFoundError('Temporal checkpoint not found.')
+    current_mtime = os.path.getmtime(TEMPORAL_MODEL_PATH)
+
+    global _temporal_model, _temporal_meta, _temporal_model_mtime
+    if (
+        _temporal_model is not None
+        and _temporal_meta is not None
+        and _temporal_model_mtime == current_mtime
+    ):
+        return _temporal_model, _temporal_meta
 
     device = get_temporal_device()
     with _temporal_lock:
-        if _temporal_model is not None and _temporal_meta is not None:
+        current_mtime = os.path.getmtime(TEMPORAL_MODEL_PATH)
+        if (
+            _temporal_model is not None
+            and _temporal_meta is not None
+            and _temporal_model_mtime == current_mtime
+        ):
             return _temporal_model, _temporal_meta
 
         ckpt = torch.load(TEMPORAL_MODEL_PATH, map_location=device)
@@ -446,6 +457,7 @@ def load_temporal():
         model.eval().to(device)
 
         _temporal_model = model
+        _temporal_model_mtime = current_mtime
         _temporal_meta = {
             'input_dim': int(ckpt.get('input_dim', TEMPORAL_INPUT_DIM)),
             'n_frames': int(ckpt.get('n_frames', TEMPORAL_N_FRAMES)),
@@ -1006,9 +1018,10 @@ def _run_temporal_training(config: TemporalTrainConfig):
         progress=0.985,
     )
     with _temporal_lock:
-        global _temporal_model, _temporal_meta
+        global _temporal_model, _temporal_meta, _temporal_model_mtime
         _temporal_model = None
         _temporal_meta = None
+        _temporal_model_mtime = None
     load_temporal()
 
     final_diagnostics = {

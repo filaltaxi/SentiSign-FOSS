@@ -51,20 +51,16 @@ N_FEATURES = 126
 # ── Load dataset from folder ──────────────────────────────────────────────────
 print(f'\nLoading dataset from {args.data} ...')
 
-signs_found = sorted([
+sign_dirs = sorted([
     d for d in os.listdir(args.data)
     if os.path.isdir(os.path.join(args.data, d))
 ])
 
-if not signs_found:
+if not sign_dirs:
     print(f'ERROR: No sign folders found in {args.data}')
     exit(1)
 
-label_to_idx = {s: i for i, s in enumerate(signs_found)}
-idx_to_label = {i: s for i, s in enumerate(signs_found)}
-num_classes  = len(signs_found)
-
-print(f'Signs found : {num_classes}')
+print(f'Sign folders found : {len(sign_dirs)}')
 
 # ── Build training windows using sliding window augmentation ──────────────────
 # Each raw recording is ~90 frames (3 seconds)
@@ -74,8 +70,10 @@ print(f'Signs found : {num_classes}')
 
 X_all, y_all = [], []
 sign_counts  = {}
+signs_found  = []
+label_to_idx = {}
 
-for sign in signs_found:
+for sign in sign_dirs:
     sign_dir = os.path.join(args.data, sign)
     samples  = sorted([f for f in os.listdir(sign_dir) if f.endswith('.npy')])
     windows_for_sign = 0
@@ -97,6 +95,9 @@ for sign in signs_found:
 
         # Slide window over raw recording
         for start in range(0, raw_len - N_FRAMES + 1, args.stride):
+            if sign not in label_to_idx:
+                label_to_idx[sign] = len(signs_found)
+                signs_found.append(sign)
             window = seq[start:start + N_FRAMES]
             X_all.append(window)
             y_all.append(label_to_idx[sign])
@@ -104,13 +105,27 @@ for sign in signs_found:
 
     sign_counts[sign] = windows_for_sign
 
+if not X_all:
+    print(f'ERROR: No valid training windows found in {args.data}')
+    exit(1)
+
+idx_to_label = {i: s for s, i in label_to_idx.items()}
+num_classes  = len(signs_found)
+skipped_signs = [s for s in sign_dirs if sign_counts.get(s, 0) == 0]
+
 X_all = np.array(X_all, dtype=np.float32)
 y_all = np.array(y_all, dtype=np.int64)
 
 print(f'\nAfter sliding window augmentation:')
+print(f'  Usable signs           : {num_classes}')
 print(f'  Total training windows : {len(X_all)}')
 print(f'  Windows per sign (avg) : {len(X_all)//num_classes}')
 print(f'  Shape                  : {X_all.shape}')
+
+if skipped_signs:
+    print(f'\n  WARNING — excluded sign folders with 0 valid windows:')
+    for sign in skipped_signs:
+        print(f'    {sign}')
 
 # Check for very sparse signs
 sparse = [(s, sign_counts[s]) for s in signs_found if sign_counts[s] < 30]
