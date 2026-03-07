@@ -8,8 +8,10 @@ import { generateSentence, generateAudio } from '../lib/api.ts';
 import { Play, Square, RotateCcw, XCircle } from 'lucide-react';
 import { useModel } from '../model/ModelContext';
 
-const HOLD_FRAMES = 10;
-const MIN_CONFIDENCE = 0.60;
+const HOLD_FRAMES_MLP = 10;
+const MIN_CONFIDENCE_MLP = 0.60;
+const HOLD_FRAMES_LSTM = 2;
+const MIN_CONFIDENCE_LSTM = 0.35;
 
 export const Communicate: React.FC = () => {
     const { model, sessionResetNonce } = useModel();
@@ -51,6 +53,9 @@ export const Communicate: React.FC = () => {
 
     const handleSignDetected = useCallback(
         (word: string | null, cls: string | null, conf: number) => {
+            const holdFrames = activeModel === 'lstm' ? HOLD_FRAMES_LSTM : HOLD_FRAMES_MLP;
+            const minConfidence = activeModel === 'lstm' ? MIN_CONFIDENCE_LSTM : MIN_CONFIDENCE_MLP;
+
             setConfidence(conf);
             setSignLabel(word ? `${cls} -> ${word}` : (cls ?? 'No sign detected'));
 
@@ -66,14 +71,14 @@ export const Communicate: React.FC = () => {
                 return;
             }
 
-            if (conf >= MIN_CONFIDENCE) {
+            if (conf >= minConfidence) {
                 trackingRef.current.holdCounter += 1;
             } else {
                 trackingRef.current.holdCounter = Math.max(0, trackingRef.current.holdCounter - 1);
             }
 
             if (
-                trackingRef.current.holdCounter >= HOLD_FRAMES &&
+                trackingRef.current.holdCounter >= holdFrames &&
                 word &&
                 word !== trackingRef.current.lastWord
             ) {
@@ -82,7 +87,7 @@ export const Communicate: React.FC = () => {
                 trackingRef.current.holdCounter = 0;
             }
         },
-        [sessionActive]
+        [activeModel, sessionActive]
     );
 
     useEffect(() => {
