@@ -6,7 +6,6 @@ readme = "SETUP.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
   "accelerate",
-  "chatterbox-tts",
   "fastapi",
   "python-dotenv",
   "mediapipe==0.10.9",
@@ -27,6 +26,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+tts = [
+  "chatterbox-tts==0.1.6",
+]
+
 train = [
   "matplotlib",
   "seaborn",

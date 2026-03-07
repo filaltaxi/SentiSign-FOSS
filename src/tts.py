@@ -62,7 +62,7 @@ def _load():
     except ImportError:
         raise ImportError(
             "[tts] chatterbox-tts not installed.\n"
-            "Fix: pip install chatterbox-tts"
+            "Fix: pip install \".[tts]\" or pip install chatterbox-tts"
         )
     device = _get_device()
 

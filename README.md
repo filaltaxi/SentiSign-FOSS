@@ -50,6 +50,11 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+If you need speech synthesis too:
+```bash
+pip install ".[tts]"
+```
+
 **3.1 — Configure local environment (optional)**
 ```bash
 cp .env.example .env
@@ -60,6 +65,11 @@ This is only needed if you want to override the default local Ollama sentence-mo
 ```bash
 uv sync
 uv run python run_pipeline.py
+```
+
+If you need speech synthesis too:
+```bash
+uv sync --extra tts
 ```
 
 **4 — Models**

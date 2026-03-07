@@ -12,6 +12,12 @@ uv --preview-features extra-build-dependencies sync
 uv --preview-features extra-build-dependencies run python run_pipeline.py
 ```
 
+If you need speech synthesis too:
+
+```bash
+uv --preview-features extra-build-dependencies sync --extra tts
+```
+
 Web UI:
 ```bash
 uv --preview-features extra-build-dependencies run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -74,7 +80,13 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-> `chatterbox-tts` pulls in torch + torchaudio automatically.
+If you need TTS:
+
+```bat
+pip install ".[tts]"
+```
+
+> `chatterbox-tts` is optional and only needed for speech synthesis.
 > No SOX. No espeak-ng. No system tools needed on Windows.
 
 ---
@@ -145,7 +157,7 @@ To fine-tune: edit values in `src/emotion_map.py`
 | Problem | Fix |
 |---|---|
 | `Permission denied` creating venv | Close VS Code, run terminal as Administrator |
-| `No module named 'chatterbox'` | `pip install chatterbox-tts` |
+| `No module named 'chatterbox'` | `pip install ".[tts]"` or `pip install chatterbox-tts` |
 | `No module named 'sentencepiece'` | `pip install sentencepiece` |
 | `(.venv)` not showing | Run `.venv\Scripts\activate.bat` |
 | sounddevice plays nothing | `python -c "import sounddevice; print(sounddevice.query_devices())"` |
