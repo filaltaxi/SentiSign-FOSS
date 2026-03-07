@@ -25,7 +25,8 @@
     "THANK_YOU",
     "WANT",
     "WRONG",
-    "YES"
+    "YES",
+    "YOU"
   ],
   "label_to_idx": {
     "BATHROOM": 0,
@@ -53,7 +54,8 @@
     "THANK_YOU": 22,
     "WANT": 23,
     "WRONG": 24,
-    "YES": 25
+    "YES": 25,
+    "YOU": 26
   },
   "idx_to_label": {
     "0": "BATHROOM",
@@ -81,7 +83,8 @@
     "22": "THANK_YOU",
     "23": "WANT",
     "24": "WRONG",
-    "25": "YES"
+    "25": "YES",
+    "26": "YOU"
   },
   "input_dim": 126,
   "n_frames": 60,

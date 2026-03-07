@@ -281,6 +281,17 @@ Important rule:
 - If two people changed the temporal dataset in parallel, merge the dataset changes first, then retrain once from the merged dataset, then commit the new checkpoint.
 - Do not try to manually resolve binary checkpoint conflicts by hand.
 
+When one teammate added one new LSTM sign locally and another teammate added a different new LSTM sign locally:
+
+- The PR should include the new dataset files under `data/temporal/asl_dataset/<WORD>/sample_###.npy`
+- If a new word was also added to the planned-word UI list, include `models/temporal/temporal_planned_words.json`
+- Do not rely on a checkpoint trained from only one person's local dataset
+- After pulling/merging both dataset folders, retrain once from the combined dataset and then commit:
+  - `models/temporal/temporal_lstm.pth`
+  - `models/temporal/temporal_label_map.json`
+
+In short: for temporal LSTM collaboration, the dataset folders are the source of truth; the `.pth` and label map are regenerated outputs.
+
 ---
 
 ## Domain Gap Analysis
