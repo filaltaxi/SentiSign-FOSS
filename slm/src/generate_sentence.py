@@ -17,30 +17,15 @@ import os
 import re
 import sys
 sys.path.insert(0, os.path.dirname(__file__))
+from buffer_clean import clean_buffer
+from example_bank import select_examples
 from sentence_model import generate
 
 SYSTEM_PROMPT = (
-    "You convert short ASL-style word buffers into one natural English sentence. "
-    "Use every input word. Add only the minimum grammar words needed. "
-    "Keep the meaning faithful. Do not explain your reasoning. "
-    "Output exactly one sentence and nothing else."
+    "You are an ASL-to-English translator. "
+    "Output only the English sentence. "
+    "Use simple, everyday spoken English. Never use formal or clinical language."
 )
-
-STRICT_SYSTEM_PROMPT = (
-    "You repair ASL-style word buffers into one short English sentence. "
-    "Do not add new content words, events, objects, descriptions, or reasons. "
-    "Only add grammar helper words such as articles, prepositions, auxiliaries, and pronouns. "
-    "Output exactly one sentence and nothing else."
-)
-
-ALLOWED_HELPER_WORDS = {
-    "a", "an", "the", "to", "at", "in", "on", "of", "for", "from", "with", "into", "by",
-    "and", "but", "or", "if", "because", "that", "this", "these", "those",
-    "am", "is", "are", "was", "were", "be", "been", "being",
-    "do", "does", "did", "have", "has", "had",
-    "will", "would", "shall", "should", "can", "could", "may", "might", "must",
-    "not", "no", "yes", "please",
-}
 
 SUBJECT_WORDS = {"i", "you", "we", "mother", "father", "child", "family"}
 TIME_WORDS = {"today", "tomorrow", "now"}
@@ -57,35 +42,8 @@ ARTICLE_OBJECTS = {
     "hospital": "the hospital",
     "toilet": "the toilet",
 }
-
-
 def _tokenise(text: str) -> list[str]:
     return re.findall(r"[a-zA-Z']+", text.lower())
-
-
-def _word_variants(token: str) -> set[str]:
-    variants = {token}
-    if len(token) > 2:
-        variants.update({
-            token + "s",
-            token + "es",
-            token + "ed",
-            token + "ing",
-            token.rstrip("e") + "ing",
-        })
-    return {variant for variant in variants if variant}
-
-
-def _unexpected_content_words(result: str, clean_words: list[str]) -> set[str]:
-    allowed = set(ALLOWED_HELPER_WORDS)
-    for word in clean_words:
-        for token in _tokenise(word):
-            allowed.update(_word_variants(token))
-
-    return {
-        token for token in _tokenise(result)
-        if token not in allowed and len(token) > 1
-    }
 
 
 def _clean_model_text(result: str) -> str:
@@ -93,12 +51,19 @@ def _clean_model_text(result: str) -> str:
     result = result.strip()
     if "Words:" in result:
         result = result.split("Words:")[-1].strip()
+    if "Signs:" in result:
+        result = result.split("Signs:")[-1].strip()
     if "Sentence:" in result:
         result = result.split("Sentence:")[-1].strip()
+    if "English:" in result:
+        result = result.split("English:")[-1].strip()
     result = re.sub(r"^(answer|output|assistant)\s*:\s*", "", result, flags=re.IGNORECASE)
     result = result.strip().strip('"').strip("'").strip()
     if "\n" in result:
         result = next((line.strip() for line in result.splitlines() if line.strip()), result)
+    sentence_match = re.match(r"(.+?[.!?])(?:\s|$)", result)
+    if sentence_match:
+        result = sentence_match.group(1).strip()
     return result
 
 
@@ -137,69 +102,6 @@ def _object_phrase(token: str) -> str:
     return ARTICLE_OBJECTS.get(token, token)
 
 
-def _rule_based_fallback(clean_words: list[str]) -> str:
-    tokens = [token for word in clean_words for token in _tokenise(word)]
-    subject = _choose_subject(tokens)
-    subject_text = _subject_phrase(subject)
-    time_tokens = [token for token in tokens if token in TIME_WORDS]
-    time_suffix = f" {time_tokens[0]}" if time_tokens else ""
-
-    if "thank" in tokens and "you" in tokens:
-        if "help" in tokens:
-            return "Thank you for your help."
-        return "Thank you."
-
-    if "sorry" in tokens:
-        return f"{subject_text} {_be_verb(subject)} sorry."
-
-    state_tokens = [token for token in tokens if token in STATE_PHRASES]
-    state_clause = None
-    if state_tokens:
-        state_clause = f"{subject_text} {_be_verb(subject)} {STATE_PHRASES[state_tokens[0]]}"
-
-    content_objects = [
-        token for token in tokens
-        if token not in SUBJECT_WORDS
-        and token not in TIME_WORDS
-        and token not in STATE_PHRASES
-        and token not in ACTION_WORDS
-        and token not in {"thank", "yes", "no", "not", "what", "where"}
-    ]
-    object_text = _object_phrase(content_objects[0]) if content_objects else None
-
-    if "go" in tokens or "come" in tokens:
-        movement = "come" if "come" in tokens else "go"
-        place = next((token for token in content_objects if token in PLACE_WORDS), None)
-        destination = _object_phrase(place) if place else None
-        if destination:
-            return f"{subject_text} will {movement} to {destination}{time_suffix}."
-        return f"{subject_text} will {movement}{time_suffix}."
-
-    if "need" in tokens:
-        clause = f"{subject_text} {_main_verb(subject, 'need')}"
-        if object_text:
-            clause = f"{clause} {object_text}"
-        if state_clause:
-            return f"{state_clause} and {_main_verb(subject, 'need')} {object_text or 'help'}{time_suffix}."
-        return f"{clause}{time_suffix}."
-
-    if "want" in tokens:
-        clause = f"{subject_text} {_main_verb(subject, 'want')}"
-        if object_text:
-            clause = f"{clause} {object_text}"
-        if state_clause:
-            return f"{state_clause} and {_main_verb(subject, 'want')} {object_text or 'help'}{time_suffix}."
-        return f"{clause}{time_suffix}."
-
-    if "help" in tokens:
-        return f"{subject_text} {_main_verb(subject, 'need')} help{time_suffix}."
-
-    if state_clause:
-        return f"{state_clause}{time_suffix}."
-
-    return " ".join(clean_words) + "."
-
-
 def words_to_sentence(words: list) -> str:
     """
     Convert a list of sign-language words into a natural English sentence.
@@ -213,62 +115,40 @@ def words_to_sentence(words: list) -> str:
     if not words:
         raise ValueError("[generate_sentence] Word list is empty.")
 
-    # Normalise: strip whitespace, title-case, drop empty tokens
-    clean = [w.strip().capitalize() for w in words if w.strip()]
-    if not clean:
+    # Normalise: strip whitespace, uppercase, drop empty tokens
+    normalized = [w.strip().upper() for w in words if w.strip()]
+    if not normalized:
         raise ValueError("[generate_sentence] No valid words after cleaning.")
 
-    word_string = ", ".join(clean)
+    cleaned = clean_buffer(normalized)
+    if not cleaned:
+        return ""
 
-    # Smaller local models behave better with explicit rules and compact examples.
+    signs_literal = ", ".join(f'"{word}"' for word in cleaned)
+    examples = select_examples(cleaned, k=1)
+
+    example_block = ""
+    for example_signs, example_sentence in examples:
+        example_literal = ", ".join(f'"{sign}"' for sign in example_signs)
+        example_block += f"Signs: [{example_literal}]\nEnglish: {example_sentence}\n\n"
+
     prompt = (
-        "Rules:\n"
-        "- Use all input words.\n"
-        "- Add missing grammar words only when needed.\n"
-        "- Keep the sentence short, natural, and grammatically correct.\n"
-        "- Output one sentence only.\n\n"
-        "Examples:\n"
-        "Words: I, Tomorrow, Hospital, Go\n"
-        "Sentence: I will go to the hospital tomorrow.\n\n"
-        "Words: Hungry, I, Food, Want\n"
-        "Sentence: I am hungry and want food.\n\n"
-        f"Words: {word_string}\n"
-        "Sentence:"
+        "Translate ASL signs into one natural English sentence.\n"
+        "Signs are ALL-CAPS, may be in ASL order, and may omit articles, auxiliaries, and prepositions.\n"
+        "Rules: include every sign's meaning, add only the grammar needed for fluent English, and never add people, events, objects, or reasons not supported by the signs.\n\n"
+        f"{example_block}"
+        f"Signs: [{signs_literal}]\n"
+        "English:"
     )
 
     print(f"[generate_sentence] Input : {words}")
-    result = _clean_model_text(generate(prompt, max_length=80, system_prompt=SYSTEM_PROMPT))
+    print(f"[generate_sentence] Clean : {cleaned}")
+    print(f"[generate_sentence] Examples: {examples}")
+    result = _clean_model_text(generate(prompt, max_length=40, system_prompt=SYSTEM_PROMPT))
 
-    # ── Post-processing ───────────────────────────────────────────────────────
-    extras = _unexpected_content_words(result, clean)
-    if extras:
-        print(f"[generate_sentence] Extra content detected {sorted(extras)} — retrying with stricter prompt.")
-        strict_prompt = (
-            "Rules:\n"
-            "- Use all input words.\n"
-            "- Do not add any new content words.\n"
-            "- You may only add helper grammar words.\n"
-            "- Output one short sentence only.\n\n"
-            f"Words: {word_string}\n"
-            "Sentence:"
-        )
-        retry = _clean_model_text(
-            generate(strict_prompt, max_length=32, system_prompt=STRICT_SYSTEM_PROMPT)
-        )
-        retry_extras = _unexpected_content_words(retry, clean)
-        if retry and not retry_extras:
-            result = retry
-        elif retry_extras:
-            print(
-                f"[generate_sentence] Retry still added extra content {sorted(retry_extras)} "
-                "- using rule-based fallback."
-            )
-            result = _rule_based_fallback(clean)
-
-    # Fallback if model returns garbage
+    # Qwen-only path: surface weak generations instead of switching to a rule engine.
     if not result or len(result.split()) < 2:
-        print("[generate_sentence] Weak output — using rule-based fallback.")
-        result = _rule_based_fallback(clean)
+        raise RuntimeError("[generate_sentence] Qwen returned unusable output.")
 
     # Ensure ends with punctuation
     if result[-1] not in ".!?":

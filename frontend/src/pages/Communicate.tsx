@@ -12,6 +12,8 @@ const HOLD_FRAMES_MLP = 10;
 const MIN_CONFIDENCE_MLP = 0.60;
 const HOLD_FRAMES_LSTM = 2;
 const MIN_CONFIDENCE_LSTM = 0.35;
+const DISPLAY_CONFIDENCE_MLP = MIN_CONFIDENCE_MLP;
+const DISPLAY_CONFIDENCE_LSTM = 0.60;
 
 export const Communicate: React.FC = () => {
     const { model, sessionResetNonce } = useModel();
@@ -55,9 +57,15 @@ export const Communicate: React.FC = () => {
         (word: string | null, cls: string | null, conf: number) => {
             const holdFrames = activeModel === 'lstm' ? HOLD_FRAMES_LSTM : HOLD_FRAMES_MLP;
             const minConfidence = activeModel === 'lstm' ? MIN_CONFIDENCE_LSTM : MIN_CONFIDENCE_MLP;
+            const displayConfidence = activeModel === 'lstm' ? DISPLAY_CONFIDENCE_LSTM : DISPLAY_CONFIDENCE_MLP;
+            const shouldDisplay = conf >= displayConfidence;
+            const nextConfidence = shouldDisplay ? conf : 0;
+            const nextSignLabel = shouldDisplay
+                ? (word ? `${cls} -> ${word}` : (cls ?? 'No sign detected'))
+                : 'No sign detected';
 
-            setConfidence(conf);
-            setSignLabel(word ? `${cls} -> ${word}` : (cls ?? 'No sign detected'));
+            setConfidence((prev) => (Object.is(prev, nextConfidence) ? prev : nextConfidence));
+            setSignLabel((prev) => (prev === nextSignLabel ? prev : nextSignLabel));
 
             if (!sessionActive || !cls) {
                 trackingRef.current.currentClass = null;

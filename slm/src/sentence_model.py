@@ -180,10 +180,11 @@ def _generate_with_ollama(prompt: str, max_length: int, system_prompt: str | Non
         "system": system_prompt or "",
         "stream": False,
         "think": False,
+        "stop": ["\n", "Signs:", "English:"],
         "keep_alive": os.environ.get("SENTISIGN_OLLAMA_KEEP_ALIVE", OLLAMA_KEEP_ALIVE),
         "options": {
             "temperature": 0,
-            "top_p": 0.9,
+            "top_p": 0.8,
             "repeat_penalty": 1.1,
             "num_predict": max_length,
         },
