@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Square } from 'lucide-react';
+import { Play, Square } from 'lucide-react';
 
 interface SentenceOutputProps {
     sentence: string | null;
@@ -16,6 +16,7 @@ export function SentenceOutput({
 }: SentenceOutputProps) {
     const [typedSentence, setTypedSentence] = useState<string>('');
     const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+    const [autoplayBlocked, setAutoplayBlocked] = useState<boolean>(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
@@ -38,14 +39,49 @@ export function SentenceOutput({
         return () => clearInterval(typeInterval);
     }, [sentence]);
 
+    const playAudio = useCallback(async () => {
+        const audioEl = audioRef.current;
+        if (!audioEl) return;
+
+        try {
+            await audioEl.play();
+            setAutoplayBlocked(false);
+        } catch {
+            setAutoplayBlocked(true);
+        }
+    }, []);
+
     useEffect(() => {
         const audioEl = audioRef.current;
-        if (audioEl) {
-            audioEl.pause();
-            audioEl.currentTime = 0;
+        if (!audioEl) {
+            setAutoplayBlocked(false);
+            Promise.resolve().then(() => setIsSpeaking(false));
+            return;
         }
+
+        audioEl.pause();
+        audioEl.currentTime = 0;
+        setAutoplayBlocked(false);
         Promise.resolve().then(() => setIsSpeaking(false));
-    }, [audioUrl]);
+
+        if (!audioUrl) {
+            return;
+        }
+
+        const handleCanPlay = () => {
+            void playAudio();
+        };
+
+        if (audioEl.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+            void playAudio();
+            return;
+        }
+
+        audioEl.addEventListener('canplay', handleCanPlay, { once: true });
+        return () => {
+            audioEl.removeEventListener('canplay', handleCanPlay);
+        };
+    }, [audioUrl, playAudio]);
 
     const stopAudio = () => {
         const audioEl = audioRef.current;
@@ -88,11 +124,15 @@ export function SentenceOutput({
                             <span className="wave-bar [animation-delay:420ms]" />
                         </div>
                     )}
+                    {autoplayBlocked && (
+                        <div className="rounded-xl border border-[#ffd4a8] bg-[#fff6ea] px-3 py-2 text-[0.76rem] font-semibold text-[#9a5a11]">
+                            Browser autoplay was blocked. Press play to start the audio.
+                        </div>
+                    )}
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
 	                        <audio
 	                            src={audioUrl}
 	                            controls
-	                            autoPlay
 	                            ref={audioRef}
 	                            onPlay={() => setIsSpeaking(true)}
 	                            onPause={() => setIsSpeaking(false)}
@@ -107,6 +147,15 @@ export function SentenceOutput({
                             >
                                 <Square size={14} fill="currentColor" /> Stop
                             </button>
+                            {autoplayBlocked && (
+                                <button
+                                    type="button"
+                                    onClick={() => void playAudio()}
+                                    className="flex min-w-[104px] items-center justify-center gap-2 rounded-xl border border-[#c8ddff] bg-white px-4 py-2.5 text-[0.8rem] font-bold text-brand transition-all duration-300 hover:bg-[#f4f9ff] hover:shadow-[0_10px_20px_rgba(0,127,255,0.12)]"
+                                >
+                                    <Play size={14} fill="currentColor" /> Play
+                                </button>
+                            )}
                             <a
                                 href={audioUrl}
                                 download={audioFilename || 'sentisign.wav'}
