@@ -51,6 +51,20 @@ ARTICLE_OBJECTS = {
     "hospital": "the hospital",
     "toilet": "the toilet",
 }
+GREETING_TARGETS = {
+    "boy": "boy",
+    "girl": "girl",
+    "child": "child",
+    "children": "children",
+    "mother": "mother",
+    "father": "father",
+    "grandmother": "grandmother",
+    "grandfather": "grandfather",
+    "family": "family",
+    "you": "to you",
+}
+
+
 def _tokenise(text: str) -> list[str]:
     return re.findall(r"[a-zA-Z']+", text.lower())
 
@@ -111,6 +125,24 @@ def _object_phrase(token: str) -> str:
     return ARTICLE_OBJECTS.get(token, token)
 
 
+def _greeting_override(cleaned: list[str]) -> str | None:
+    lowered = [token.lower() for token in cleaned]
+    if lowered == ["hello"]:
+        return "Hello."
+
+    if "hello" not in lowered or len(lowered) != 2:
+        return None
+
+    target = next((token for token in lowered if token != "hello"), None)
+    if target not in GREETING_TARGETS:
+        return None
+
+    phrase = GREETING_TARGETS[target]
+    if phrase.startswith("to "):
+        return f"Hello {phrase}."
+    return f"Hello, {phrase}."
+
+
 def words_to_sentence(words: list) -> str:
     """
     Convert a list of sign-language words into a natural English sentence.
@@ -132,6 +164,13 @@ def words_to_sentence(words: list) -> str:
     cleaned = clean_buffer(normalized)
     if not cleaned:
         return ""
+
+    greeting = _greeting_override(cleaned)
+    if greeting is not None:
+        print(f"[generate_sentence] Input : {words}")
+        print(f"[generate_sentence] Clean : {cleaned}")
+        print(f"[generate_sentence] Greeting override: {greeting}")
+        return greeting
 
     override_key = tuple(cleaned)
     if override_key in _EXACT_OVERRIDES:
@@ -155,7 +194,8 @@ def words_to_sentence(words: list) -> str:
     prompt = (
         "Translate ASL signs into one natural English sentence.\n"
         "Signs are ALL-CAPS, may be in ASL order, and may omit articles, auxiliaries, and prepositions.\n"
-        "Rules: include every sign's meaning, add only the grammar needed for fluent English, and never add people, events, objects, or reasons not supported by the signs.\n\n"
+        "Rules: include every sign's meaning, add only the grammar needed for fluent English, and never add people, events, objects, or reasons not supported by the signs.\n"
+        "If HELLO appears with a person word such as BOY or GIRL, prefer a direct greeting like 'Hello, boy.' instead of narrating who is speaking.\n\n"
         f"{example_block}"
         f"Signs: {signs_literal}\n"
         "English: "
