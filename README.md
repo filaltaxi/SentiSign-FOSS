@@ -15,7 +15,7 @@ SentiSign translates ASL hand signs and facial emotion into natural, emotionally
 | 3 | MLP classifier maps landmarks to vocabulary words |
 | 4 | ResNet CNN detects facial emotion simultaneously |
 | 5 | Ollama `qwen3.5:0.8b` generates a grammatical sentence from word buffer |
-| 6 | Chatterbox synthesises speech locally |
+| 6 | Cartesia synthesises speech with emotion-aware voice controls |
 
 ---
 
@@ -59,7 +59,7 @@ pip install ".[tts]"
 ```bash
 cp .env.example .env
 ```
-This is only needed if you want to override the default local Ollama sentence-model settings.
+This is only needed if you want to override the default local Ollama sentence-model settings or switch the TTS backend.
 
 **Alternative: install + run with `uv`**
 ```bash
@@ -71,6 +71,21 @@ If you need speech synthesis too:
 ```bash
 uv sync --extra tts
 ```
+
+TTS backend selection is controlled in `.env`:
+
+```bash
+SENTISIGN_TTS_ENGINE=cartesia
+```
+
+or
+
+```bash
+SENTISIGN_TTS_ENGINE=chatterbox
+```
+
+Cartesia is the default and uses the standard app dependencies.
+Only run `uv sync --extra tts` if you want the Chatterbox fallback available locally.
 
 **4 — Models**
 
@@ -161,7 +176,7 @@ SentiSign-OMAR/
 ├── src/
 │   ├── sign_recognizer.py          # Desktop pipeline (terminal)
 │   ├── emotion_detector.py         # ResNet FER
-│   ├── tts.py                      # Chatterbox TTS
+│   ├── tts.py                      # Switchable Cartesia / Chatterbox TTS
 │   └── emotion_map.py              # Emotion → prosody parameters
 │
 ├── frontend/
@@ -238,9 +253,9 @@ SentiSign-OMAR/
 - **Output:** grammatical sentence (`"I need help."`)
 
 ### Speech Synthesis
-- **TTS engine:** Chatterbox-TTS (local)
+- **TTS engine:** Cartesia `sonic-3` by default, Chatterbox via `.env`
 - **Emotion profiles:** 7 (one per emotion class)
-- **Parameters tuned:** exaggeration, CFG weight
+- **Controls used:** Cartesia voice hints or Chatterbox prosody controls, depending on `SENTISIGN_TTS_ENGINE`
 
 ---
 

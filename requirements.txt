@@ -4,12 +4,10 @@
 # Python 3.10 recommended
 # ─────────────────────────────────────────────────────────────
 
-# TTS — Chatterbox (real emotion control via exaggeration + cfg_weight)
-chatterbox-tts
+# TTS — Cartesia by default; Chatterbox available via `uv sync --extra tts`
 python-dotenv
 
 # Sentence generation — flan-t5-large
-# torch + transformers already pulled in by chatterbox-tts
 sentencepiece          # REQUIRED by T5Tokenizer — do not skip
 accelerate             # speeds up flan-t5-large on GPU
 

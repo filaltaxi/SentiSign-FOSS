@@ -63,10 +63,10 @@ export function About() {
                         </div>
                         <div className="flex items-center gap-3 mb-2">
                             <h3 className="font-semibold text-[1.1rem] text-text">Emotion-Aware Speech</h3>
-                            <span className="text-[0.7rem] px-2 py-0.5 rounded-md bg-[rgba(255,179,71,0.1)] border border-amber/20 text-amber font-medium">Chatterbox-TTS</span>
+                            <span className="text-[0.7rem] px-2 py-0.5 rounded-md bg-[rgba(255,179,71,0.1)] border border-amber/20 text-amber font-medium">Cartesia default</span>
                         </div>
                         <p className="text-muted text-[0.95rem] leading-relaxed max-w-[600px]">
-                            The sentence is synthesised using Chatterbox-TTS with seven emotion-specific prosodic profiles &mdash; exaggeration and CFG weight tuned per emotion &mdash; producing speech that sounds genuinely different across emotional states.
+                            The sentence is synthesised with Cartesia Sonic-3 by default, with an optional Chatterbox fallback selectable through the backend environment. That keeps Cartesia as the main path while still allowing a local fallback engine.
                         </p>
                     </div>
 
@@ -98,7 +98,7 @@ export function About() {
             <div>
                 <h2 className="font-heading font-bold text-[1.2rem] text-brand uppercase tracking-widest mb-6">Technology Stack</h2>
                 <div className="flex flex-wrap gap-2.5">
-                    {['Python 3.10', 'FastAPI', 'PyTorch 2.6 + CUDA', 'MediaPipe 0.10.9', 'MediaPipe.js', 'Flan-T5-Large', 'Chatterbox-TTS', 'ResNet CNN', 'scikit-learn', 'OpenCV'].map(tech => (
+                    {['Python 3.10', 'FastAPI', 'PyTorch 2.6 + CUDA', 'MediaPipe 0.10.9', 'MediaPipe.js', 'Flan-T5-Large', 'Cartesia + Chatterbox', 'ResNet CNN', 'scikit-learn', 'OpenCV'].map(tech => (
                         <div key={tech} className="bg-surface border border-border-color rounded-lg px-3.5 py-1.5 text-[0.85rem] text-muted shadow-sm">
                             {tech}
                         </div>

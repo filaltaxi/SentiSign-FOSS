@@ -1,9 +1,9 @@
 # src/play_audio.py
 # ─────────────────────────────────────────────────────────────────────────────
 # Audio playback and .wav saving.
-# Handles both torch.Tensor (Chatterbox output) and numpy arrays.
+# Handles both torch.Tensor and numpy arrays.
 # Uses sounddevice for playback — no SOX, no system audio tools needed.
-# Uses torchaudio for saving (already installed with chatterbox-tts).
+# Uses torchaudio if available, otherwise falls back to scipy.
 # ─────────────────────────────────────────────────────────────────────────────
 
 import numpy as np

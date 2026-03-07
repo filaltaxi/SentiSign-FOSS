@@ -14,7 +14,7 @@
 #       └──────────┬───────────────┘
 #                  ▼  sentence model
 #       grammatically correct English sentence
-#                  ▼  Chatterbox-TTS (exaggeration + cfg_weight)
+#                  ▼  Configurable TTS engine
 #              🔊  emotion-expressive audio
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ for p in [_SRC, _SLM_SRC]:
 from emotion_map       import print_emotion_table
 from generate_sentence import words_to_sentence
 from sentence_model    import get_backend_label
-from tts               import get_output_extension, speak_and_save
+from tts               import get_engine_label, get_output_extension, speak_and_save
 from sign_recognizer   import capture_words_and_emotion
 
 
@@ -47,7 +47,7 @@ from sign_recognizer   import capture_words_and_emotion
 def get_inputs() -> tuple[list[str], str]:
     print("\n" + "═" * 64)
     print("  SentiSign  |  Sign Language → Emotion-Aware Speech")
-    print(f"  Models: {get_backend_label()}  +  Chatterbox-TTS  +  ResNet Emotion")
+    print(f"  Models: {get_backend_label()}  +  {get_engine_label()} TTS  +  ResNet Emotion")
     print("═" * 64)
     print_emotion_table()
 
@@ -72,7 +72,7 @@ def run():
 
     # Step 2 — TTS with emotion
     print("\n" + "─" * 64)
-    print(f"  [2/2]  Synthesising speech  (emotion: {emotion}, engine: Chatterbox) ...")
+    print(f"  [2/2]  Synthesising speech  (emotion: {emotion}, engine: {get_engine_label()}) ...")
 
     from datetime import datetime
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -89,7 +89,7 @@ def run():
     print(f"  Words    : {words}")
     print(f"  Sentence : \"{sentence}\"")
     print(f"  Emotion  : {emotion}")
-    print("  Engine   : Chatterbox")
+    print(f"  Engine   : {get_engine_label()}")
     print("═" * 64)
 
 

@@ -26,13 +26,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-tts = [
-  "chatterbox-tts==0.1.6",
-]
-
 train = [
   "matplotlib",
   "seaborn",
+]
+tts = [
+    "chatterbox-tts==0.1.6",
 ]
 
 [tool.uv]

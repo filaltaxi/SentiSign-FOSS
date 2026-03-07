@@ -140,7 +140,7 @@ _startup_status = {
         {'id': 'temporal', 'label': 'Temporal sign model (optional)', 'state': 'pending', 'detail': None},
         {'id': 'emotion', 'label': 'Emotion model', 'state': 'pending', 'detail': None},
         {'id': 'sentence', 'label': 'Sentence model', 'state': 'pending', 'detail': None},
-        {'id': 'tts', 'label': 'TTS engine (Chatterbox)', 'state': 'pending', 'detail': None},
+        {'id': 'tts', 'label': 'TTS engine', 'state': 'pending', 'detail': None},
         {'id': 'custom_signs', 'label': 'Custom sign mappings', 'state': 'pending', 'detail': None},
     ],
 }
@@ -1598,7 +1598,7 @@ async def generate_and_speak(req: GenerateRequest):
         raise HTTPException(500, f'Sentence generation failed: {e}')
 
     try:
-        from tts import get_output_extension, speak_and_save
+        from tts import get_engine_id, get_output_extension, speak_and_save
     except Exception as e:
         raise HTTPException(500, f'TTS setup failed: {e}')
 
@@ -1626,7 +1626,7 @@ async def generate_and_speak(req: GenerateRequest):
         headers={
             'X-Sentence': sentence,
             'X-Filename': filename,
-            'X-TTS-Engine': 'chatterbox',
+            'X-TTS-Engine': get_engine_id(),
             'Content-Disposition': f'inline; filename="{filename}"',
         }
     )

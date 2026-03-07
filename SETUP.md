@@ -1,5 +1,5 @@
 # SentiSign — Setup & Run Guide
-## Stack: Ollama qwen3.5:0.8b + Chatterbox TTS | Python 3.10 | Windows
+## Stack: Ollama qwen3.5:0.8b + Switchable Cartesia/Chatterbox TTS | Python 3.10 | Windows
 
 ---
 
@@ -10,12 +10,6 @@ From the repo root:
 ```bash
 uv --preview-features extra-build-dependencies sync
 uv --preview-features extra-build-dependencies run python run_pipeline.py
-```
-
-If you need speech synthesis too:
-
-```bash
-uv --preview-features extra-build-dependencies sync --extra tts
 ```
 
 Web UI:
@@ -38,8 +32,8 @@ SentiSign-OMAR/
 ├── requirements.txt         ← all dependencies
 │
 ├── src/                     ← TTS + emotion modules
-│   ├── tts.py               ← Chatterbox TTS wrapper
-│   ├── emotion_map.py       ← emotion → exaggeration + cfg_weight
+│   ├── tts.py               ← TTS engine switcher + backend wrappers
+│   ├── emotion_map.py       ← emotion → backend control hints
 │   └── play_audio.py        ← sounddevice playback, .wav saving
 │
 └── slm/                     ← sentence generation module
@@ -80,14 +74,24 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-If you need TTS:
+Cartesia TTS uses the standard app dependencies.
+If you want the Chatterbox fallback too:
 
-```bat
-pip install ".[tts]"
+```bash
+uv --preview-features extra-build-dependencies sync --extra tts
 ```
 
-> `chatterbox-tts` is optional and only needed for speech synthesis.
-> No SOX. No espeak-ng. No system tools needed on Windows.
+Set the engine in `.env`:
+
+```bash
+SENTISIGN_TTS_ENGINE=cartesia
+```
+
+or
+
+```bash
+SENTISIGN_TTS_ENGINE=chatterbox
+```
 
 ---
 
@@ -111,7 +115,6 @@ Optional legacy fallback:
 python slm\download_model.py
 ```
 
-> Chatterbox model (~1GB) auto-downloads on first `run_pipeline.py` run.
 > `slm\download_model.py` is only needed when using `SENTISIGN_SENTENCE_PROVIDER=hf`.
 
 ---
@@ -130,23 +133,23 @@ python run_pipeline.py
   [1/2] Generating sentence...
   ✓  Sentence: "I will go to the hospital tomorrow."
 
-  [2/2] Synthesising (exaggeration=0.25, cfg_weight=0.20)...
-  🔊  Slow, heavy, subdued — genuinely sad delivery
+  [2/2] Synthesising with the selected TTS engine (emotion: sad)...
+  🔊  Emotion-aware speech generated and saved as WAV
 ```
 
 ---
 
 ## Emotion → Parameter Reference
 
-| Emotion  | Exaggeration | CFG Weight | What you hear                       |
-|----------|-------------|------------|-------------------------------------|
-| neutral  | 0.50        | 0.50       | Calm, balanced, natural             |
-| happy    | 0.85        | 0.60       | Warm, bright, energetic             |
-| sad      | 0.25        | 0.20       | Subdued, heavy, slow                |
-| angry    | 1.40        | 0.20       | Intense, forceful, fast             |
-| fear     | 0.70        | 0.15       | Tense, hesitant, slow               |
-| disgust  | 0.30        | 0.75       | Cold, flat, deliberate              |
-| surprise | 1.20        | 0.65       | Dramatic, sharp, expressive         |
+| Emotion  | Cartesia hint   | Chatterbox fallback                 |
+|----------|-----------------|-------------------------------------|
+| neutral  | none            | Calm, balanced, natural             |
+| happy    | positivity:high | Warm, bright, energetic             |
+| sad      | sadness:high    | Subdued, heavy, slower              |
+| angry    | anger:high      | Intense, forceful, clipped          |
+| fear     | fear:high       | Tense, hesitant                     |
+| disgust  | disgust:high    | Cold, flat, deliberate              |
+| surprise | surprise:high   | Dramatic, sharp, expressive         |
 
 To fine-tune: edit values in `src/emotion_map.py`
 
@@ -157,7 +160,8 @@ To fine-tune: edit values in `src/emotion_map.py`
 | Problem | Fix |
 |---|---|
 | `Permission denied` creating venv | Close VS Code, run terminal as Administrator |
-| `No module named 'chatterbox'` | `pip install ".[tts]"` or `pip install chatterbox-tts` |
+| `Cartesia API key missing` | Add `CARTESIA_API=` or `CARTESIA_API_KEY=` to `.env` |
+| `Chatterbox selected but chatterbox-tts is not installed` | Run `uv sync --extra tts` |
 | `No module named 'sentencepiece'` | `pip install sentencepiece` |
 | `(.venv)` not showing | Run `.venv\Scripts\activate.bat` |
 | sounddevice plays nothing | `python -c "import sounddevice; print(sounddevice.query_devices())"` |
