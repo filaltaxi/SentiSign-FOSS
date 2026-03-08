@@ -11,6 +11,7 @@ import { useModel } from '../model/ModelContext';
 const HOLD_FRAMES_MLP = 10;
 const MIN_CONFIDENCE_MLP = 0.60;
 const MIN_CONFIDENCE_LSTM = 0.60;
+const LSTM_STABLE_TICKS = 3;
 const LSTM_DUPLICATE_GUARD_MS = 1000;
 const DISPLAY_CONFIDENCE_MLP = MIN_CONFIDENCE_MLP;
 const DISPLAY_CONFIDENCE_LSTM = MIN_CONFIDENCE_LSTM;
@@ -18,6 +19,7 @@ const DISPLAY_CONFIDENCE_LSTM = MIN_CONFIDENCE_LSTM;
 export const Communicate: React.FC = () => {
     const { model, sessionResetNonce } = useModel();
     const activeModel = model ?? 'mlp';
+    const [commitResetNonce, setCommitResetNonce] = useState(0);
     const [wordBuffer, setWordBuffer] = useState<string[]>([]);
     const [sentence, setSentence] = useState<string>('');
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -32,11 +34,20 @@ export const Communicate: React.FC = () => {
     const canGenerate = wordBuffer.length > 0;
     const isGenerating = generationStage !== 'idle';
 
-    const trackingRef = useRef<{ holdCounter: number; currentClass: string | null; lastWord: string; lastCommitAt: number }>({
+    const trackingRef = useRef<{
+        holdCounter: number;
+        currentClass: string | null;
+        lastWord: string;
+        lastCommittedClass: string | null;
+        lastCommitAt: number;
+        repeatArmed: boolean;
+    }>({
         holdCounter: 0,
         currentClass: null,
         lastWord: '',
+        lastCommittedClass: null,
         lastCommitAt: 0,
+        repeatArmed: true,
     });
 
     const generationAbortRef = useRef<AbortController | null>(null);
@@ -54,6 +65,11 @@ export const Communicate: React.FC = () => {
         };
     }, []);
 
+    const commitDetectedWord = useCallback((word: string) => {
+        setWordBuffer((prev) => [...prev, word]);
+        setCommitResetNonce((prev) => prev + 1);
+    }, []);
+
     const handleSignDetected = useCallback(
         (word: string | null, cls: string | null, conf: number) => {
             const minConfidence = activeModel === 'lstm' ? MIN_CONFIDENCE_LSTM : MIN_CONFIDENCE_MLP;
@@ -67,29 +83,58 @@ export const Communicate: React.FC = () => {
             setConfidence((prev) => (Object.is(prev, nextConfidence) ? prev : nextConfidence));
             setSignLabel((prev) => (prev === nextSignLabel ? prev : nextSignLabel));
 
-            if (!sessionActive || !cls) {
+            if (!sessionActive) {
                 trackingRef.current.currentClass = null;
                 trackingRef.current.holdCounter = 0;
+                trackingRef.current.repeatArmed = true;
                 return;
             }
 
             if (activeModel === 'lstm') {
-                if (!word || conf < minConfidence) {
+                if (!cls || !word || conf < minConfidence) {
+                    trackingRef.current.currentClass = null;
+                    trackingRef.current.holdCounter = 0;
+                    trackingRef.current.repeatArmed = true;
+                    return;
+                }
+
+                if (cls !== trackingRef.current.currentClass) {
+                    if (trackingRef.current.lastCommittedClass && cls !== trackingRef.current.lastCommittedClass) {
+                        trackingRef.current.repeatArmed = true;
+                    }
+                    trackingRef.current.currentClass = cls;
+                    trackingRef.current.holdCounter = 1;
+                    return;
+                }
+
+                trackingRef.current.holdCounter += 1;
+                if (trackingRef.current.holdCounter < LSTM_STABLE_TICKS) {
                     return;
                 }
 
                 const now = Date.now();
+                const isRepeatCommit = trackingRef.current.lastCommittedClass === cls;
                 if (
-                    trackingRef.current.lastWord === word &&
-                    now - trackingRef.current.lastCommitAt < LSTM_DUPLICATE_GUARD_MS
+                    isRepeatCommit &&
+                    (
+                        !trackingRef.current.repeatArmed ||
+                        now - trackingRef.current.lastCommitAt < LSTM_DUPLICATE_GUARD_MS
+                    )
                 ) {
                     return;
                 }
 
-                setWordBuffer((prev) => [...prev, word]);
+                commitDetectedWord(word);
                 trackingRef.current.lastWord = word;
+                trackingRef.current.lastCommittedClass = cls;
                 trackingRef.current.lastCommitAt = now;
-                trackingRef.current.currentClass = cls;
+                trackingRef.current.holdCounter = 0;
+                trackingRef.current.repeatArmed = false;
+                return;
+            }
+
+            if (!cls) {
+                trackingRef.current.currentClass = null;
                 trackingRef.current.holdCounter = 0;
                 return;
             }
@@ -111,13 +156,13 @@ export const Communicate: React.FC = () => {
                 word &&
                 word !== trackingRef.current.lastWord
             ) {
-                setWordBuffer((prev) => [...prev, word]);
+                commitDetectedWord(word);
                 trackingRef.current.lastWord = word;
                 trackingRef.current.lastCommitAt = Date.now();
                 trackingRef.current.holdCounter = 0;
             }
         },
-        [activeModel, sessionActive]
+        [activeModel, commitDetectedWord, sessionActive]
     );
 
     useEffect(() => {
@@ -147,7 +192,9 @@ export const Communicate: React.FC = () => {
         trackingRef.current.holdCounter = 0;
         trackingRef.current.currentClass = null;
         trackingRef.current.lastWord = '';
+        trackingRef.current.lastCommittedClass = null;
         trackingRef.current.lastCommitAt = 0;
+        trackingRef.current.repeatArmed = true;
     }, [cancelGeneration]);
 
     useEffect(() => {
@@ -162,6 +209,7 @@ export const Communicate: React.FC = () => {
             setSessionActive(false);
             trackingRef.current.holdCounter = 0;
             trackingRef.current.currentClass = null;
+            trackingRef.current.repeatArmed = true;
         }
 
         generationAbortRef.current?.abort();
@@ -224,6 +272,7 @@ export const Communicate: React.FC = () => {
                     <WebcamPane
                         model={activeModel}
                         isActive={sessionActive}
+                        commitResetNonce={commitResetNonce}
                         onEmotionDetected={setDetectedEmotion}
                         onSignDetected={handleSignDetected}
                         currentEmotion={detectedEmotion}
@@ -257,7 +306,9 @@ export const Communicate: React.FC = () => {
                                         trackingRef.current.holdCounter = 0;
                                         trackingRef.current.currentClass = null;
                                         trackingRef.current.lastWord = '';
+                                        trackingRef.current.lastCommittedClass = null;
                                         trackingRef.current.lastCommitAt = 0;
+                                        trackingRef.current.repeatArmed = true;
                                     }
                                     return next;
                                 });

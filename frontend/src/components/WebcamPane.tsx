@@ -6,6 +6,7 @@ import { extractTemporalFeatures, hasTemporalSignal } from '../lib/handFeatures'
 interface WebcamPaneProps {
     model: SignModel;
     isActive: boolean;
+    commitResetNonce: number;
     onEmotionDetected: (emotion: EmotionType) => void;
     onSignDetected: (word: string | null, cls: string | null, confidence: number) => void;
     currentEmotion: EmotionType;
@@ -28,11 +29,19 @@ declare global {
 const RECOGNISE_DELAY = 80;
 const LSTM_N_FRAMES = 60;
 const LSTM_FEATURE_DIM = 126;
-const LSTM_MIN_SIGN_FRAMES = 10;
+const LSTM_MIN_INFERENCE_FRAMES = 10;
 const LSTM_NO_SIGNAL_FRAMES = 10;
-const LSTM_COOLDOWN_MS = 1000;
+const LSTM_STRIDE_FRAMES = 5;
+const LSTM_POST_COMMIT_KEEP_FRAMES = 6;
+const LSTM_WINDOW_SEGMENTS = 12;
 
-type TemporalCaptureState = 'idle' | 'collecting' | 'cooldown';
+type TemporalHudState = {
+    windowFrames: number;
+    signalFrames: number;
+    strideFrames: number;
+    hasSignal: boolean;
+    inFlight: boolean;
+};
 
 function padTemporalSequence(sequence: number[][]): number[][] {
     if (sequence.length >= LSTM_N_FRAMES) {
@@ -47,6 +56,7 @@ function padTemporalSequence(sequence: number[][]): number[][] {
 export function WebcamPane({
     model,
     isActive,
+    commitResetNonce,
     onEmotionDetected,
     onSignDetected,
     currentEmotion,
@@ -55,7 +65,13 @@ export function WebcamPane({
 }: WebcamPaneProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [cooldownRemainingMs, setCooldownRemainingMs] = useState(0);
+    const [temporalHud, setTemporalHud] = useState<TemporalHudState>({
+        windowFrames: 0,
+        signalFrames: 0,
+        strideFrames: 0,
+        hasSignal: false,
+        inFlight: false,
+    });
 
     // Keep latest callback props without forcing MediaPipe to re-subscribe.
     const onEmotionDetectedRef = useRef(onEmotionDetected);
@@ -69,10 +85,38 @@ export function WebcamPane({
         onSignDetectedRef.current = onSignDetected;
     }, [onSignDetected]);
 
-    const setCooldownRemaining = useCallback((nextMs: number) => {
-        const normalized = Math.max(0, nextMs);
-        setCooldownRemainingMs((prev) => (Math.abs(prev - normalized) < 35 ? prev : normalized));
+    const syncTemporalHud = useCallback((next: TemporalHudState) => {
+        setTemporalHud((prev) => {
+            if (
+                prev.windowFrames === next.windowFrames &&
+                prev.signalFrames === next.signalFrames &&
+                prev.strideFrames === next.strideFrames &&
+                prev.hasSignal === next.hasSignal &&
+                prev.inFlight === next.inFlight
+            ) {
+                return prev;
+            }
+            return next;
+        });
     }, []);
+
+    const trimTemporalWindowAfterCommit = useCallback(() => {
+        const temporal = mpRef.current;
+        if (model !== 'lstm' || !isActive) return;
+
+        temporal.frameBuffer = temporal.frameBuffer.slice(-LSTM_POST_COMMIT_KEEP_FRAMES);
+        temporal.signalFrameCount = 0;
+        temporal.strideFrames = 0;
+        temporal.noSignalFrames = 0;
+
+        syncTemporalHud({
+            windowFrames: temporal.frameBuffer.length,
+            signalFrames: 0,
+            strideFrames: 0,
+            hasSignal: temporal.frameBuffer.length > 0,
+            inFlight: temporal.temporalRequestInFlight,
+        });
+    }, [isActive, model, syncTemporalHud]);
 
     // Ref to hold the MediaPipe instances
     const mpRef = useRef<{
@@ -81,9 +125,9 @@ export function WebcamPane({
         emotionInterval: ReturnType<typeof setInterval> | null;
         lastRecogniseTime: number;
         frameBuffer: number[][];
-        temporalState: TemporalCaptureState;
+        signalFrameCount: number;
         noSignalFrames: number;
-        cooldownUntil: number;
+        strideFrames: number;
         temporalRequestInFlight: boolean;
         inputCanvas: HTMLCanvasElement | null;
         inputCtx: CanvasRenderingContext2D | null;
@@ -93,9 +137,9 @@ export function WebcamPane({
         emotionInterval: null,
         lastRecogniseTime: 0,
         frameBuffer: [],
-        temporalState: 'idle',
+        signalFrameCount: 0,
         noSignalFrames: 0,
-        cooldownUntil: 0,
+        strideFrames: 0,
         temporalRequestInFlight: false,
         inputCanvas: null,
         inputCtx: null,
@@ -181,6 +225,13 @@ export function WebcamPane({
         const runTemporalRecognition = async (sequence: number[][]) => {
             if (mpRef.current.temporalRequestInFlight) return;
             mpRef.current.temporalRequestInFlight = true;
+            syncTemporalHud({
+                windowFrames: mpRef.current.frameBuffer.length,
+                signalFrames: mpRef.current.signalFrameCount,
+                strideFrames: mpRef.current.strideFrames,
+                hasSignal: true,
+                inFlight: true,
+            });
 
             try {
                 const res = await fetch('/api/temporal/recognise', {
@@ -197,77 +248,87 @@ export function WebcamPane({
                 console.error('Temporal recognise API failed', err);
             } finally {
                 mpRef.current.temporalRequestInFlight = false;
+                syncTemporalHud({
+                    windowFrames: mpRef.current.frameBuffer.length,
+                    signalFrames: mpRef.current.signalFrameCount,
+                    strideFrames: mpRef.current.strideFrames,
+                    hasSignal: true,
+                    inFlight: false,
+                });
             }
         };
 
         const temporal = mpRef.current;
-        const now = Date.now();
-
-        if (temporal.temporalState === 'cooldown') {
-            setCooldownRemaining(Math.max(0, temporal.cooldownUntil - now));
-            temporal.noSignalFrames = hasSignal ? 0 : temporal.noSignalFrames + 1;
-
-            if (now >= temporal.cooldownUntil && temporal.noSignalFrames >= LSTM_NO_SIGNAL_FRAMES) {
-                temporal.temporalState = 'idle';
-                temporal.noSignalFrames = 0;
-                setCooldownRemaining(0);
-                onSignDetectedRef.current(null, null, 0);
-            }
-            return;
-        }
-
-        setCooldownRemaining(0);
 
         if (hasSignal) {
             temporal.noSignalFrames = 0;
-            if (temporal.temporalState !== 'collecting') {
-                temporal.temporalState = 'collecting';
-                temporal.frameBuffer = [];
-                onSignDetectedRef.current(null, null, 0);
-            }
-
+            temporal.signalFrameCount += 1;
+            temporal.strideFrames += 1;
             temporal.frameBuffer.push(features);
 
-            if (temporal.frameBuffer.length >= LSTM_N_FRAMES) {
+            if (temporal.frameBuffer.length > LSTM_N_FRAMES) {
+                temporal.frameBuffer.shift();
+            }
+
+            const readyForInference =
+                temporal.signalFrameCount >= LSTM_MIN_INFERENCE_FRAMES &&
+                temporal.strideFrames >= LSTM_STRIDE_FRAMES;
+
+            if (readyForInference) {
+                temporal.strideFrames = 0;
+                syncTemporalHud({
+                    windowFrames: temporal.frameBuffer.length,
+                    signalFrames: temporal.signalFrameCount,
+                    strideFrames: temporal.strideFrames,
+                    hasSignal: true,
+                    inFlight: temporal.temporalRequestInFlight,
+                });
                 const sequence = padTemporalSequence(temporal.frameBuffer);
-                temporal.frameBuffer = [];
-                temporal.temporalState = 'cooldown';
-                temporal.cooldownUntil = now + LSTM_COOLDOWN_MS;
-                temporal.noSignalFrames = 0;
-                setCooldownRemaining(LSTM_COOLDOWN_MS);
                 await runTemporalRecognition(sequence);
+            } else {
+                syncTemporalHud({
+                    windowFrames: temporal.frameBuffer.length,
+                    signalFrames: temporal.signalFrameCount,
+                    strideFrames: temporal.strideFrames,
+                    hasSignal: true,
+                    inFlight: temporal.temporalRequestInFlight,
+                });
             }
             return;
         }
 
         temporal.noSignalFrames += 1;
+        temporal.strideFrames = 0;
 
-        if (temporal.temporalState === 'collecting' && temporal.noSignalFrames >= LSTM_NO_SIGNAL_FRAMES) {
-            const completedSign = temporal.frameBuffer;
+        if (temporal.noSignalFrames >= LSTM_NO_SIGNAL_FRAMES) {
             temporal.frameBuffer = [];
-
-            if (completedSign.length >= LSTM_MIN_SIGN_FRAMES) {
-                const sequence = padTemporalSequence(completedSign);
-                temporal.temporalState = 'cooldown';
-                temporal.cooldownUntil = now + LSTM_COOLDOWN_MS;
-                temporal.noSignalFrames = 1;
-                setCooldownRemaining(LSTM_COOLDOWN_MS);
-                await runTemporalRecognition(sequence);
-            } else {
-                temporal.temporalState = 'idle';
-                temporal.noSignalFrames = 0;
-                setCooldownRemaining(0);
-                onSignDetectedRef.current(null, null, 0);
-            }
+            temporal.signalFrameCount = 0;
+            syncTemporalHud({
+                windowFrames: 0,
+                signalFrames: 0,
+                strideFrames: 0,
+                hasSignal: false,
+                inFlight: false,
+            });
+            onSignDetectedRef.current(null, null, 0);
             return;
         }
 
-        if (temporal.temporalState === 'idle' && temporal.noSignalFrames >= LSTM_NO_SIGNAL_FRAMES) {
-            onSignDetectedRef.current(null, null, 0);
-        }
-    }, [model, setCooldownRemaining]);
+        syncTemporalHud({
+            windowFrames: temporal.frameBuffer.length,
+            signalFrames: temporal.signalFrameCount,
+            strideFrames: 0,
+            hasSignal: false,
+            inFlight: temporal.temporalRequestInFlight,
+        });
+    }, [model, syncTemporalHud]);
 
     // Lifecycle for Camera / Session
+    useEffect(() => {
+        if (commitResetNonce === 0) return;
+        trimTemporalWindowAfterCommit();
+    }, [commitResetNonce, trimTemporalWindowAfterCommit]);
+
     useEffect(() => {
         let ignore = false;
 
@@ -276,13 +337,19 @@ export function WebcamPane({
 
             mpRef.current.lastRecogniseTime = 0;
             mpRef.current.frameBuffer = [];
-            mpRef.current.temporalState = 'idle';
+            mpRef.current.signalFrameCount = 0;
             mpRef.current.noSignalFrames = 0;
-            mpRef.current.cooldownUntil = 0;
+            mpRef.current.strideFrames = 0;
             mpRef.current.temporalRequestInFlight = false;
-            setCooldownRemaining(0);
             mpRef.current.inputCanvas = null;
             mpRef.current.inputCtx = null;
+            syncTemporalHud({
+                windowFrames: 0,
+                signalFrames: 0,
+                strideFrames: 0,
+                hasSignal: false,
+                inFlight: false,
+            });
 
             if (mpRef.current.emotionInterval) {
                 clearInterval(mpRef.current.emotionInterval);
@@ -291,13 +358,17 @@ export function WebcamPane({
             if (mpRef.current.camera) {
                 try {
                     mpRef.current.camera.stop();
-                } catch { }
+                } catch {
+                    // Camera shutdown can race with teardown during rapid toggles.
+                }
                 mpRef.current.camera = null;
             }
             if (mpRef.current.hands) {
                 try {
                     mpRef.current.hands.close();
-                } catch { }
+                } catch {
+                    // MediaPipe may already be disposed by the time cleanup runs.
+                }
                 mpRef.current.hands = null;
             }
             if (videoRef.current?.srcObject) {
@@ -308,7 +379,9 @@ export function WebcamPane({
             if (videoRef.current) {
                 try {
                     videoRef.current.pause();
-                } catch { }
+                } catch {
+                    // Safe to ignore if the element was never fully initialized.
+                }
             }
             if (canvasRef.current) {
                 const ctx = canvasRef.current.getContext('2d');
@@ -333,11 +406,10 @@ export function WebcamPane({
                 stopSession({ resetEmotion: false });
                 mpRef.current.lastRecogniseTime = 0;
                 mpRef.current.frameBuffer = [];
-                mpRef.current.temporalState = 'idle';
+                mpRef.current.signalFrameCount = 0;
                 mpRef.current.noSignalFrames = 0;
-                mpRef.current.cooldownUntil = 0;
+                mpRef.current.strideFrames = 0;
                 mpRef.current.temporalRequestInFlight = false;
-                setCooldownRemaining(0);
 
                 const handsDetector = new window.Hands({
                     locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`
@@ -424,7 +496,9 @@ export function WebcamPane({
                         if (data.emotion && !ignore) {
                             onEmotionDetectedRef.current(data.emotion);
                         }
-                    } catch { }
+                    } catch {
+                        // Emotion polling should fail soft without interrupting the session.
+                    }
                 }, 500);
 
             } catch (err) {
@@ -443,9 +517,13 @@ export function WebcamPane({
             ignore = true;
             stopSession();
         };
-    }, [isActive, onHandResults, setCooldownRemaining]);
+    }, [isActive, model, onHandResults, syncTemporalHud]);
 
-    const cooldownSeconds = cooldownRemainingMs > 0 ? (cooldownRemainingMs / 1000).toFixed(1) : null;
+    const windowProgress = Math.min(1, temporalHud.windowFrames / LSTM_N_FRAMES);
+    const readyProgress = Math.min(1, temporalHud.signalFrames / LSTM_MIN_INFERENCE_FRAMES);
+    const stridePipsFilled = temporalHud.inFlight
+        ? LSTM_STRIDE_FRAMES
+        : Math.min(LSTM_STRIDE_FRAMES, temporalHud.strideFrames);
 
     return (
         <div className={`relative overflow-hidden rounded-2xl border bg-[#eef5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-500 ${isActive ? 'camera-live-shell border-[#9fc9ff] shadow-[0_18px_36px_rgba(0,127,255,0.22)]' : 'border-[#c9defd]'}`}>
@@ -480,9 +558,72 @@ export function WebcamPane({
                     {isActive ? currentEmotion : '—'}
                 </div>
 
-                {model === 'lstm' && cooldownSeconds !== null && (
-                    <div className="absolute bottom-3 right-3 rounded-lg border border-[#ffd1ba] bg-white/94 px-3 py-1.5 text-[0.72rem] font-bold uppercase tracking-[0.14em] text-[#c85a21] shadow-[0_8px_18px_rgba(15,34,68,0.12)]">
-                        Relax {cooldownSeconds}s
+                {model === 'lstm' && isActive && (
+                    <div className="absolute bottom-3 left-3 w-[min(232px,calc(100%-1.5rem))] rounded-2xl border border-[#d6e5fb] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(244,249,255,0.92)_100%)] px-3 py-2.5 text-text shadow-[0_14px_28px_rgba(15,34,68,0.14)] backdrop-blur-sm">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className={`h-2 w-2 rounded-full transition-all duration-300 ${temporalHud.inFlight ? 'bg-[#ff8a50] shadow-[0_0_10px_rgba(255,138,80,0.55)]' : temporalHud.hasSignal ? 'bg-brand shadow-[0_0_10px_rgba(0,127,255,0.35)]' : 'bg-[#a8bfdc]'}`} />
+                                <span className="text-[0.64rem] font-bold uppercase tracking-[0.18em] text-muted">
+                                    {temporalHud.inFlight ? 'Scanning' : temporalHud.hasSignal ? 'Tracking' : 'Idle'}
+                                </span>
+                            </div>
+                            <span className="rounded-full border border-[#ffd4bf] bg-[#fff4ed] px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.18em] text-[#c85a21]">
+                                Continuous
+                            </span>
+                        </div>
+
+                        <div className="mt-2 flex items-end justify-between gap-3">
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="font-heading text-[1.1rem] font-black leading-none text-text">
+                                    {temporalHud.windowFrames}
+                                </span>
+                                <span className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted">
+                                    / {LSTM_N_FRAMES}
+                                </span>
+                            </div>
+                            <div className="text-[0.58rem] font-bold uppercase tracking-[0.18em] text-muted">
+                                Window
+                            </div>
+                        </div>
+
+                        <div className="mt-2 grid grid-cols-12 gap-1">
+                            {Array.from({ length: LSTM_WINDOW_SEGMENTS }, (_, index) => {
+                                const filled = windowProgress >= (index + 1) / LSTM_WINDOW_SEGMENTS;
+                                return (
+                                    <span
+                                        key={index}
+                                        className={`h-1.5 rounded-full transition-all duration-300 ${filled ? 'bg-gradient-to-r from-brand to-brand-end shadow-[0_0_10px_rgba(0,127,255,0.24)]' : 'bg-[#dbe8fb]'}`}
+                                    />
+                                );
+                            })}
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between text-[0.56rem] font-bold uppercase tracking-[0.18em] text-muted">
+                                    <span>Warmup</span>
+                                    <span>{Math.min(temporalHud.signalFrames, LSTM_MIN_INFERENCE_FRAMES)}/{LSTM_MIN_INFERENCE_FRAMES}</span>
+                                </div>
+                                <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#dbe8fb]">
+                                    <div
+                                        className="h-full rounded-full bg-gradient-to-r from-brand to-[#80bcff] transition-all duration-300"
+                                        style={{ width: `${readyProgress * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                {Array.from({ length: LSTM_STRIDE_FRAMES }, (_, index) => {
+                                    const active = index < stridePipsFilled;
+                                    return (
+                                        <span
+                                            key={index}
+                                            className={`h-2 w-2 rounded-full transition-all duration-300 ${active ? 'bg-[#ff9b68] shadow-[0_0_8px_rgba(255,155,104,0.38)]' : 'bg-[#d9e3f2]'}`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
