@@ -16,8 +16,8 @@ Run:
 """
 
 import os, json, argparse, numpy as np
+from contextlib import nullcontext
 import torch, torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, top_k_accuracy_score, confusion_matrix
@@ -37,6 +37,7 @@ parser.add_argument('--lr',        type=float, default=3e-4)
 parser.add_argument('--batch',     type=int,   default=32)
 parser.add_argument('--window',    type=int,   default=60,  help='Frames per training window')
 parser.add_argument('--stride',    type=int,   default=5,   help='Sliding window stride for augmentation')
+parser.add_argument('--log-every', type=int,   default=1,   help='Print metrics every N epochs')
 args = parser.parse_args()
 
 os.makedirs(args.out, exist_ok=True)
@@ -44,6 +45,21 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'\nDevice : {device}')
 if device.type == 'cuda':
     print(f'GPU    : {torch.cuda.get_device_name(0)}')
+
+
+def make_grad_scaler(device: torch.device):
+    enabled = device.type == 'cuda'
+    if hasattr(torch, 'amp') and hasattr(torch.amp, 'GradScaler'):
+        return torch.amp.GradScaler(device.type, enabled=enabled)
+    return torch.cuda.amp.GradScaler(enabled=enabled)
+
+
+def autocast_context(device: torch.device):
+    if device.type != 'cuda':
+        return nullcontext()
+    if hasattr(torch, 'amp') and hasattr(torch.amp, 'autocast'):
+        return torch.amp.autocast(device_type='cuda')
+    return torch.cuda.amp.autocast()
 
 N_FRAMES   = args.window
 N_FEATURES = 126
@@ -283,7 +299,7 @@ class_weights_t  = torch.from_numpy(class_weights).to(device)
 criterion = nn.CrossEntropyLoss(weight=class_weights_t, label_smoothing=0.05)
 optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=20, T_mult=2)
-scaler    = GradScaler(enabled=(device.type == 'cuda'))
+scaler    = make_grad_scaler(device)
 
 PATIENCE   = args.patience
 best_val   = 0.0
@@ -302,7 +318,7 @@ for epoch in range(1, args.epochs + 1):
     for xb, yb in train_loader:
         xb, yb = xb.to(device, non_blocking=True), yb.to(device, non_blocking=True)
         optimizer.zero_grad(set_to_none=True)
-        with autocast(enabled=(device.type == 'cuda')):
+        with autocast_context(device):
             out  = model(xb)
             loss = criterion(out, yb)
         scaler.scale(loss).backward()
@@ -322,7 +338,7 @@ for epoch in range(1, args.epochs + 1):
     with torch.no_grad():
         for xb, yb in val_loader:
             xb = xb.to(device, non_blocking=True)
-            with autocast(enabled=(device.type == 'cuda')):
+            with autocast_context(device):
                 logits = model(xb)
             vc += (logits.argmax(1) == yb.to(device)).sum().item()
             vt += len(yb)
@@ -345,7 +361,7 @@ for epoch in range(1, args.epochs + 1):
     else:
         no_improve += 1
 
-    if epoch % 5 == 0 or epoch == 1:
+    if epoch % args.log_every == 0 or epoch == 1:
         print(f'{epoch:6d}  {tl/tt:8.4f}  {tc/tt*100:6.2f}%  {val_acc*100:6.2f}%  {top5*100:5.1f}%{marker}')
 
     if no_improve >= PATIENCE:
@@ -396,7 +412,7 @@ all_logits, all_preds, all_gt = [], [], []
 with torch.no_grad():
     for xb, yb in val_loader:
         xb = xb.to(device)
-        with autocast(enabled=(device.type == 'cuda')):
+        with autocast_context(device):
             logits = model(xb).cpu().float().numpy()
         all_logits.append(logits)
         all_preds.extend(logits.argmax(1).tolist())
