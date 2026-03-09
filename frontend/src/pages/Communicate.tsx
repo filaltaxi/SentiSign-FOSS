@@ -192,7 +192,7 @@ const GLOBAL_STYLES = `
 }
 
 .ss-word-buffer-shell {
-    height: 92px;
+    height: 116px;
 }
 
 @media (max-height: 800px) {
@@ -223,7 +223,7 @@ const GLOBAL_STYLES = `
     }
 
     .ss-word-buffer-shell {
-        height: 76px;
+        height: 92px;
     }
 }
 `;
@@ -823,6 +823,7 @@ export const Communicate: React.FC = () => {
                                 type="button"
                                 onClick={() => {
                                     setInitialized(true);
+                                    handleStartSession();
                                     setTimeout(() => setCameraReady(true), 800);
                                 }}
                                 whileHover={{ scale: 1.025, y: -2 }}
@@ -904,7 +905,7 @@ export const Communicate: React.FC = () => {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            background: 'linear-gradient(180deg, rgba(4,12,30,0.9) 0%, transparent 100%)',
+                            background: 'linear-gradient(180deg, rgba(4,12,30,0.42) 0%, rgba(4,12,30,0.14) 52%, transparent 100%)',
                         }}
                     >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -998,7 +999,7 @@ export const Communicate: React.FC = () => {
                 transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 style={{ display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0, height: '100%', overflow: 'hidden' }}
             >
-                <div className="ss-panel-lit ss-card-pad" style={{ flexShrink: 0 }}>
+                <div className="ss-panel-lit ss-card-pad" style={{ flexShrink: 0, marginTop: 'auto' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.7rem' }}>
                         <div>
                             <h2
