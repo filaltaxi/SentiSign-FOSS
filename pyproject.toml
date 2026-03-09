@@ -23,6 +23,7 @@ dependencies = [
   "transformers",
   "torchvision==0.21.0",
   "uvicorn[standard]",
+  "seaborn>=0.13.2",
 ]
 
 [project.optional-dependencies]

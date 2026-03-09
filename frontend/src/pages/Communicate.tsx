@@ -16,6 +16,32 @@ const LSTM_DUPLICATE_GUARD_MS = 250;
 const DISPLAY_CONFIDENCE_MLP = MIN_CONFIDENCE_MLP;
 const DISPLAY_CONFIDENCE_LSTM = MIN_CONFIDENCE_LSTM;
 
+type EmotionCounts = Record<EmotionType, number>;
+
+const createEmotionCounts = (): EmotionCounts => ({
+    neutral: 0,
+    happy: 0,
+    sad: 0,
+    angry: 0,
+    fear: 0,
+    disgust: 0,
+    surprise: 0,
+});
+
+const getMostFrequentEmotion = (counts: EmotionCounts): EmotionType => {
+    let winner: EmotionType = 'neutral';
+    let winnerCount = counts.neutral;
+
+    (Object.entries(counts) as [EmotionType, number][]).forEach(([emotion, count]) => {
+        if (count > winnerCount) {
+            winner = emotion;
+            winnerCount = count;
+        }
+    });
+
+    return winner;
+};
+
 export const Communicate: React.FC = () => {
     const { model, sessionResetNonce } = useModel();
     const activeModel = model ?? 'mlp';
@@ -27,10 +53,11 @@ export const Communicate: React.FC = () => {
     const [generationError, setGenerationError] = useState<string | null>(null);
     const [generationStage, setGenerationStage] = useState<'idle' | 'sentence' | 'audio'>('idle');
     const [sessionActive, setSessionActive] = useState<boolean>(false);
-    const [detectedEmotion, setDetectedEmotion] = useState<EmotionType>('neutral');
+    const [emotionCounts, setEmotionCounts] = useState<EmotionCounts>(() => createEmotionCounts());
     const [emotionOverride, setEmotionOverride] = useState<EmotionType | null>(null);
     const [signLabel, setSignLabel] = useState<string>('No sign detected');
     const [confidence, setConfidence] = useState<number>(0);
+    const detectedEmotion = getMostFrequentEmotion(emotionCounts);
     const selectedEmotion = emotionOverride ?? detectedEmotion;
     const canGenerate = wordBuffer.length > 0;
     const isGenerating = generationStage !== 'idle';
@@ -71,6 +98,15 @@ export const Communicate: React.FC = () => {
         setWordBuffer((prev) => [...prev, word]);
         setCommitResetNonce((prev) => prev + 1);
     }, []);
+
+    const handleEmotionDetected = useCallback((emotion: EmotionType) => {
+        if (!sessionActive) return;
+
+        setEmotionCounts((prev) => ({
+            ...prev,
+            [emotion]: prev[emotion] + 1,
+        }));
+    }, [sessionActive]);
 
     const handleSignDetected = useCallback(
         (word: string | null, cls: string | null, conf: number, meta?: SignDetectionMeta) => {
@@ -176,6 +212,7 @@ export const Communicate: React.FC = () => {
         setSentence('');
         setAudioUrl(null);
         setAudioFilename(null);
+        setEmotionCounts(createEmotionCounts());
         setSignLabel('No sign detected');
         setConfidence(0);
         trackingRef.current.holdCounter = 0;
@@ -264,7 +301,7 @@ export const Communicate: React.FC = () => {
                         model={activeModel}
                         isActive={sessionActive}
                         commitResetNonce={commitResetNonce}
-                        onEmotionDetected={setDetectedEmotion}
+                        onEmotionDetected={handleEmotionDetected}
                         onSignDetected={handleSignDetected}
                         currentEmotion={detectedEmotion}
                         wordLabel={sessionActive ? signLabel : 'No sign detected'}
@@ -294,6 +331,7 @@ export const Communicate: React.FC = () => {
                                 setSessionActive((prev) => {
                                     const next = !prev;
                                     if (next) {
+                                        setEmotionCounts(createEmotionCounts());
                                         trackingRef.current.holdCounter = 0;
                                         trackingRef.current.currentClass = null;
                                         trackingRef.current.lastWord = '';
@@ -361,7 +399,7 @@ export const Communicate: React.FC = () => {
                             </button>
                         </div>
                         <div className="mb-3 text-[0.78rem] text-muted">
-                            Auto-detected: <span className="font-semibold capitalize text-text">{detectedEmotion}</span>
+                            Most detected: <span className="font-semibold capitalize text-text">{detectedEmotion}</span>
                             {emotionOverride && <span className="ml-2 rounded-full bg-[#ecf4ff] px-2 py-0.5 text-[0.66rem] font-bold uppercase tracking-[0.13em] text-brand">Manual override</span>}
                         </div>
                         <EmotionStrip currentEmotion={selectedEmotion} onSelectEmotion={setEmotionOverride} />
