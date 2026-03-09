@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { WebcamPane } from '../components/WebcamPane';
+import type { SignDetectionMeta } from '../components/WebcamPane';
 import { WordBuffer } from '../components/WordBuffer';
 import { EmotionStrip } from '../components/EmotionStrip';
 import { SentenceOutput } from '../components/SentenceOutput';
@@ -11,10 +12,7 @@ import { useModel } from '../model/ModelContext';
 const HOLD_FRAMES_MLP = 10;
 const MIN_CONFIDENCE_MLP = 0.60;
 const MIN_CONFIDENCE_LSTM = 0.60;
-const LSTM_STABLE_TICKS = 2;
-const LSTM_FAST_COMMIT_CONFIDENCE = 0.78;
-const LSTM_FAST_COMMIT_MARGIN = 0.18;
-const LSTM_DUPLICATE_GUARD_MS = 1000;
+const LSTM_DUPLICATE_GUARD_MS = 250;
 const DISPLAY_CONFIDENCE_MLP = MIN_CONFIDENCE_MLP;
 const DISPLAY_CONFIDENCE_LSTM = MIN_CONFIDENCE_LSTM;
 
@@ -73,10 +71,11 @@ export const Communicate: React.FC = () => {
     }, []);
 
     const handleSignDetected = useCallback(
-        (word: string | null, cls: string | null, conf: number, meta?: { margin?: number }) => {
+        (word: string | null, cls: string | null, conf: number, meta?: SignDetectionMeta) => {
             const minConfidence = activeModel === 'lstm' ? MIN_CONFIDENCE_LSTM : MIN_CONFIDENCE_MLP;
             const displayConfidence = activeModel === 'lstm' ? DISPLAY_CONFIDENCE_LSTM : DISPLAY_CONFIDENCE_MLP;
-            const shouldDisplay = conf >= displayConfidence;
+            const isTemporalReset = activeModel === 'lstm' && meta?.phase === 'reset';
+            const shouldDisplay = !isTemporalReset && conf >= displayConfidence;
             const nextConfidence = shouldDisplay ? conf : 0;
             const nextSignLabel = shouldDisplay
                 ? (word ? `${cls} -> ${word}` : (cls ?? 'No sign detected'))
@@ -93,58 +92,31 @@ export const Communicate: React.FC = () => {
             }
 
             if (activeModel === 'lstm') {
-                const margin = Number.isFinite(meta?.margin) ? Number(meta?.margin) : 0;
-                if (!cls || !word || conf < minConfidence) {
+                if (meta?.phase !== 'final') {
                     trackingRef.current.currentClass = null;
                     trackingRef.current.holdCounter = 0;
-                    trackingRef.current.repeatArmed = true;
                     return;
                 }
 
-                if (cls !== trackingRef.current.currentClass) {
-                    const isFreshClass = cls !== trackingRef.current.lastCommittedClass;
-                    if (isFreshClass && conf >= LSTM_FAST_COMMIT_CONFIDENCE && margin >= LSTM_FAST_COMMIT_MARGIN) {
-                        commitDetectedWord(word);
-                        trackingRef.current.currentClass = cls;
-                        trackingRef.current.lastWord = word;
-                        trackingRef.current.lastCommittedClass = cls;
-                        trackingRef.current.lastCommitAt = Date.now();
-                        trackingRef.current.holdCounter = 0;
-                        trackingRef.current.repeatArmed = false;
-                        return;
-                    }
-
-                    if (trackingRef.current.lastCommittedClass && cls !== trackingRef.current.lastCommittedClass) {
-                        trackingRef.current.repeatArmed = true;
-                    }
-                    trackingRef.current.currentClass = cls;
-                    trackingRef.current.holdCounter = 1;
-                    return;
-                }
-
-                trackingRef.current.holdCounter += 1;
-                if (trackingRef.current.holdCounter < LSTM_STABLE_TICKS) {
+                if (!cls || !word || conf < minConfidence) {
                     return;
                 }
 
                 const now = Date.now();
-                const isRepeatCommit = trackingRef.current.lastCommittedClass === cls;
                 if (
-                    isRepeatCommit &&
-                    (
-                        !trackingRef.current.repeatArmed ||
-                        now - trackingRef.current.lastCommitAt < LSTM_DUPLICATE_GUARD_MS
-                    )
+                    trackingRef.current.lastCommittedClass === cls &&
+                    now - trackingRef.current.lastCommitAt < LSTM_DUPLICATE_GUARD_MS
                 ) {
                     return;
                 }
 
                 commitDetectedWord(word);
+                trackingRef.current.currentClass = cls;
                 trackingRef.current.lastWord = word;
                 trackingRef.current.lastCommittedClass = cls;
                 trackingRef.current.lastCommitAt = now;
                 trackingRef.current.holdCounter = 0;
-                trackingRef.current.repeatArmed = false;
+                trackingRef.current.repeatArmed = true;
                 return;
             }
 

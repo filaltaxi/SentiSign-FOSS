@@ -12,7 +12,7 @@ interface WebcamPaneProps {
         word: string | null,
         cls: string | null,
         confidence: number,
-        meta?: { margin?: number }
+        meta?: SignDetectionMeta
     ) => void;
     currentEmotion: EmotionType;
     wordLabel: string;
@@ -37,15 +37,25 @@ const LSTM_FEATURE_DIM = 126;
 const LSTM_MIN_INFERENCE_FRAMES = 10;
 const LSTM_NO_SIGNAL_FRAMES = 10;
 const LSTM_STRIDE_FRAMES = 5;
-const LSTM_POST_COMMIT_KEEP_FRAMES = 6;
 const LSTM_WINDOW_SEGMENTS = 12;
+const LSTM_COOLDOWN_MS = 500;
+
+export type SignDetectionMeta = {
+    margin?: number;
+    phase?: 'preview' | 'final' | 'reset';
+};
+
+type TemporalSegmentPhase = 'idle' | 'collecting' | 'cooldown';
 
 type TemporalHudState = {
     windowFrames: number;
     signalFrames: number;
     strideFrames: number;
+    noSignalFrames: number;
+    cooldownRemainingMs: number;
     hasSignal: boolean;
     inFlight: boolean;
+    phase: TemporalSegmentPhase;
 };
 
 function padTemporalSequence(sequence: number[][]): number[][] {
@@ -74,8 +84,11 @@ export function WebcamPane({
         windowFrames: 0,
         signalFrames: 0,
         strideFrames: 0,
+        noSignalFrames: 0,
+        cooldownRemainingMs: 0,
         hasSignal: false,
         inFlight: false,
+        phase: 'idle',
     });
 
     // Keep latest callback props without forcing MediaPipe to re-subscribe.
@@ -96,8 +109,11 @@ export function WebcamPane({
                 prev.windowFrames === next.windowFrames &&
                 prev.signalFrames === next.signalFrames &&
                 prev.strideFrames === next.strideFrames &&
+                prev.noSignalFrames === next.noSignalFrames &&
+                prev.cooldownRemainingMs === next.cooldownRemainingMs &&
                 prev.hasSignal === next.hasSignal &&
-                prev.inFlight === next.inFlight
+                prev.inFlight === next.inFlight &&
+                prev.phase === next.phase
             ) {
                 return prev;
             }
@@ -109,17 +125,20 @@ export function WebcamPane({
         const temporal = mpRef.current;
         if (model !== 'lstm' || !isActive) return;
 
-        temporal.frameBuffer = temporal.frameBuffer.slice(-LSTM_POST_COMMIT_KEEP_FRAMES);
+        temporal.frameBuffer = [];
         temporal.signalFrameCount = 0;
         temporal.strideFrames = 0;
         temporal.noSignalFrames = 0;
 
         syncTemporalHud({
-            windowFrames: temporal.frameBuffer.length,
+            windowFrames: 0,
             signalFrames: 0,
             strideFrames: 0,
-            hasSignal: temporal.frameBuffer.length > 0,
+            noSignalFrames: temporal.noSignalFrames,
+            cooldownRemainingMs: Math.max(0, temporal.cooldownUntilMs - Date.now()),
+            hasSignal: temporal.temporalPhase === 'cooldown',
             inFlight: temporal.temporalRequestInFlight,
+            phase: temporal.temporalPhase,
         });
     }, [isActive, model, syncTemporalHud]);
 
@@ -133,6 +152,8 @@ export function WebcamPane({
         signalFrameCount: number;
         noSignalFrames: number;
         strideFrames: number;
+        cooldownUntilMs: number;
+        temporalPhase: TemporalSegmentPhase;
         temporalRequestInFlight: boolean;
         inputCanvas: HTMLCanvasElement | null;
         inputCtx: CanvasRenderingContext2D | null;
@@ -145,6 +166,8 @@ export function WebcamPane({
         signalFrameCount: 0,
         noSignalFrames: 0,
         strideFrames: 0,
+        cooldownUntilMs: 0,
+        temporalPhase: 'idle',
         temporalRequestInFlight: false,
         inputCanvas: null,
         inputCtx: null,
@@ -203,13 +226,13 @@ export function WebcamPane({
 
         const features = extractTemporalFeatures(results);
         const hasSignal = hasTemporalSignal(features);
+        const now = Date.now();
 
         if (model === 'mlp') {
             if (!hasSignal) {
                 onSignDetectedRef.current(null, null, 0);
                 return;
             }
-            const now = Date.now();
             if (now - mpRef.current.lastRecogniseTime < RECOGNISE_DELAY) return;
             mpRef.current.lastRecogniseTime = now;
 
@@ -227,15 +250,21 @@ export function WebcamPane({
             return;
         }
 
-        const runTemporalRecognition = async (sequence: number[][]) => {
+        const runTemporalRecognition = async (
+            sequence: number[][],
+            phase: 'preview' | 'final'
+        ) => {
             if (mpRef.current.temporalRequestInFlight) return;
             mpRef.current.temporalRequestInFlight = true;
             syncTemporalHud({
                 windowFrames: mpRef.current.frameBuffer.length,
                 signalFrames: mpRef.current.signalFrameCount,
                 strideFrames: mpRef.current.strideFrames,
-                hasSignal: true,
+                noSignalFrames: mpRef.current.noSignalFrames,
+                cooldownRemainingMs: Math.max(0, mpRef.current.cooldownUntilMs - Date.now()),
+                hasSignal,
                 inFlight: true,
+                phase: mpRef.current.temporalPhase,
             });
 
             try {
@@ -251,7 +280,10 @@ export function WebcamPane({
                 const top5 = Array.isArray(data.top5) ? data.top5 : [];
                 const top1 = Number.isFinite(Number(top5[0]?.[1])) ? Number(top5[0]?.[1]) : conf;
                 const top2 = Number.isFinite(Number(top5[1]?.[1])) ? Number(top5[1]?.[1]) : 0;
-                onSignDetectedRef.current(word, cls, conf, { margin: Math.max(0, top1 - top2) });
+                onSignDetectedRef.current(word, cls, conf, {
+                    margin: Math.max(0, top1 - top2),
+                    phase,
+                });
             } catch (err) {
                 console.error('Temporal recognise API failed', err);
             } finally {
@@ -260,8 +292,11 @@ export function WebcamPane({
                     windowFrames: mpRef.current.frameBuffer.length,
                     signalFrames: mpRef.current.signalFrameCount,
                     strideFrames: mpRef.current.strideFrames,
-                    hasSignal: true,
+                    noSignalFrames: mpRef.current.noSignalFrames,
+                    cooldownRemainingMs: Math.max(0, mpRef.current.cooldownUntilMs - Date.now()),
+                    hasSignal,
                     inFlight: false,
+                    phase: mpRef.current.temporalPhase,
                 });
             }
         };
@@ -270,36 +305,91 @@ export function WebcamPane({
 
         if (hasSignal) {
             temporal.noSignalFrames = 0;
+            if (temporal.temporalPhase === 'cooldown') {
+                if (now < temporal.cooldownUntilMs) {
+                    syncTemporalHud({
+                        windowFrames: 0,
+                        signalFrames: 0,
+                        strideFrames: 0,
+                        noSignalFrames: 0,
+                        cooldownRemainingMs: Math.max(0, temporal.cooldownUntilMs - now),
+                        hasSignal: true,
+                        inFlight: temporal.temporalRequestInFlight,
+                        phase: temporal.temporalPhase,
+                    });
+                    return;
+                }
+
+                temporal.temporalPhase = 'collecting';
+                temporal.cooldownUntilMs = 0;
+                temporal.frameBuffer = [];
+                temporal.signalFrameCount = 0;
+                temporal.strideFrames = 0;
+
+                syncTemporalHud({
+                    windowFrames: 0,
+                    signalFrames: 0,
+                    strideFrames: 0,
+                    noSignalFrames: 0,
+                    cooldownRemainingMs: 0,
+                    hasSignal: true,
+                    inFlight: temporal.temporalRequestInFlight,
+                    phase: temporal.temporalPhase,
+                });
+            }
+
+            if (temporal.temporalPhase === 'idle') {
+                temporal.temporalPhase = 'collecting';
+                temporal.frameBuffer = [];
+                temporal.signalFrameCount = 0;
+                temporal.strideFrames = 0;
+                temporal.cooldownUntilMs = 0;
+            }
+
             temporal.signalFrameCount += 1;
             temporal.strideFrames += 1;
             temporal.frameBuffer.push(features);
 
-            if (temporal.frameBuffer.length > LSTM_N_FRAMES) {
-                temporal.frameBuffer.shift();
-            }
-
-            const readyForInference =
+            const segmentReachedMax = temporal.frameBuffer.length >= LSTM_N_FRAMES;
+            const readyForPreview =
                 temporal.signalFrameCount >= LSTM_MIN_INFERENCE_FRAMES &&
                 temporal.strideFrames >= LSTM_STRIDE_FRAMES;
 
-            if (readyForInference) {
+            if (segmentReachedMax) {
+                const sequence = padTemporalSequence(temporal.frameBuffer);
+                temporal.temporalPhase = 'cooldown';
+                temporal.cooldownUntilMs = Date.now() + LSTM_COOLDOWN_MS;
+                temporal.frameBuffer = [];
+                temporal.signalFrameCount = 0;
                 temporal.strideFrames = 0;
+                await runTemporalRecognition(sequence, 'final');
                 syncTemporalHud({
-                    windowFrames: temporal.frameBuffer.length,
-                    signalFrames: temporal.signalFrameCount,
-                    strideFrames: temporal.strideFrames,
+                    windowFrames: 0,
+                    signalFrames: 0,
+                    strideFrames: 0,
+                    noSignalFrames: 0,
+                    cooldownRemainingMs: Math.max(0, temporal.cooldownUntilMs - Date.now()),
                     hasSignal: true,
                     inFlight: temporal.temporalRequestInFlight,
+                    phase: temporal.temporalPhase,
                 });
+                return;
+            }
+
+            if (readyForPreview) {
+                temporal.strideFrames = 0;
                 const sequence = padTemporalSequence(temporal.frameBuffer);
-                await runTemporalRecognition(sequence);
+                await runTemporalRecognition(sequence, 'preview');
             } else {
                 syncTemporalHud({
                     windowFrames: temporal.frameBuffer.length,
                     signalFrames: temporal.signalFrameCount,
                     strideFrames: temporal.strideFrames,
+                    noSignalFrames: temporal.noSignalFrames,
+                    cooldownRemainingMs: 0,
                     hasSignal: true,
                     inFlight: temporal.temporalRequestInFlight,
+                    phase: temporal.temporalPhase,
                 });
             }
             return;
@@ -308,17 +398,51 @@ export function WebcamPane({
         temporal.noSignalFrames += 1;
         temporal.strideFrames = 0;
 
-        if (temporal.noSignalFrames >= LSTM_NO_SIGNAL_FRAMES) {
+        if (temporal.temporalPhase === 'collecting' && temporal.noSignalFrames >= LSTM_NO_SIGNAL_FRAMES) {
+            const sequence =
+                temporal.frameBuffer.length >= LSTM_MIN_INFERENCE_FRAMES
+                    ? padTemporalSequence(temporal.frameBuffer)
+                    : null;
             temporal.frameBuffer = [];
             temporal.signalFrameCount = 0;
+            temporal.noSignalFrames = 0;
+            temporal.cooldownUntilMs = 0;
+            temporal.temporalPhase = 'idle';
+
+            if (sequence) {
+                await runTemporalRecognition(sequence, 'final');
+            } else {
+                onSignDetectedRef.current(null, null, 0, { phase: 'reset' });
+            }
+
             syncTemporalHud({
                 windowFrames: 0,
                 signalFrames: 0,
                 strideFrames: 0,
+                noSignalFrames: temporal.noSignalFrames,
+                cooldownRemainingMs: 0,
                 hasSignal: false,
-                inFlight: false,
+                inFlight: temporal.temporalRequestInFlight,
+                phase: temporal.temporalPhase,
             });
-            onSignDetectedRef.current(null, null, 0);
+            return;
+        }
+
+        if (temporal.temporalPhase === 'cooldown' && now >= temporal.cooldownUntilMs) {
+            temporal.temporalPhase = 'idle';
+            temporal.noSignalFrames = 0;
+            temporal.cooldownUntilMs = 0;
+            onSignDetectedRef.current(null, null, 0, { phase: 'reset' });
+            syncTemporalHud({
+                windowFrames: 0,
+                signalFrames: 0,
+                strideFrames: 0,
+                noSignalFrames: temporal.noSignalFrames,
+                cooldownRemainingMs: 0,
+                hasSignal: false,
+                inFlight: temporal.temporalRequestInFlight,
+                phase: temporal.temporalPhase,
+            });
             return;
         }
 
@@ -326,8 +450,11 @@ export function WebcamPane({
             windowFrames: temporal.frameBuffer.length,
             signalFrames: temporal.signalFrameCount,
             strideFrames: 0,
+            noSignalFrames: temporal.noSignalFrames,
+            cooldownRemainingMs: Math.max(0, temporal.cooldownUntilMs - now),
             hasSignal: false,
             inFlight: temporal.temporalRequestInFlight,
+            phase: temporal.temporalPhase,
         });
     }, [model, syncTemporalHud]);
 
@@ -348,6 +475,8 @@ export function WebcamPane({
             mpRef.current.signalFrameCount = 0;
             mpRef.current.noSignalFrames = 0;
             mpRef.current.strideFrames = 0;
+            mpRef.current.cooldownUntilMs = 0;
+            mpRef.current.temporalPhase = 'idle';
             mpRef.current.temporalRequestInFlight = false;
             mpRef.current.inputCanvas = null;
             mpRef.current.inputCtx = null;
@@ -355,8 +484,11 @@ export function WebcamPane({
                 windowFrames: 0,
                 signalFrames: 0,
                 strideFrames: 0,
+                noSignalFrames: 0,
+                cooldownRemainingMs: 0,
                 hasSignal: false,
                 inFlight: false,
+                phase: 'idle',
             });
 
             if (mpRef.current.emotionInterval) {
@@ -417,6 +549,8 @@ export function WebcamPane({
                 mpRef.current.signalFrameCount = 0;
                 mpRef.current.noSignalFrames = 0;
                 mpRef.current.strideFrames = 0;
+                mpRef.current.cooldownUntilMs = 0;
+                mpRef.current.temporalPhase = 'idle';
                 mpRef.current.temporalRequestInFlight = false;
 
                 const handsDetector = new window.Hands({
@@ -528,10 +662,31 @@ export function WebcamPane({
     }, [isActive, model, onHandResults, syncTemporalHud]);
 
     const windowProgress = Math.min(1, temporalHud.windowFrames / LSTM_N_FRAMES);
-    const readyProgress = Math.min(1, temporalHud.signalFrames / LSTM_MIN_INFERENCE_FRAMES);
+    const readyProgress = temporalHud.phase === 'cooldown'
+        ? Math.min(1, (LSTM_COOLDOWN_MS - temporalHud.cooldownRemainingMs) / LSTM_COOLDOWN_MS)
+        : Math.min(1, temporalHud.signalFrames / LSTM_MIN_INFERENCE_FRAMES);
     const stridePipsFilled = temporalHud.inFlight
         ? LSTM_STRIDE_FRAMES
         : Math.min(LSTM_STRIDE_FRAMES, temporalHud.strideFrames);
+    const temporalPhaseLabel = temporalHud.inFlight
+        ? 'Scanning'
+        : temporalHud.phase === 'collecting'
+            ? 'Collecting'
+            : temporalHud.phase === 'cooldown'
+                ? 'Cooldown'
+                : 'Idle';
+    const temporalPhaseDotClass = temporalHud.inFlight
+        ? 'bg-[#ff8a50] shadow-[0_0_10px_rgba(255,138,80,0.55)]'
+        : temporalHud.phase === 'collecting'
+            ? 'bg-brand shadow-[0_0_10px_rgba(0,127,255,0.35)]'
+            : temporalHud.phase === 'cooldown'
+                ? 'bg-[#ffb357] shadow-[0_0_10px_rgba(255,179,87,0.4)]'
+                : 'bg-[#a8bfdc]';
+    const segmentLabel = temporalHud.phase === 'cooldown' ? 'Cooldown' : 'Segment';
+    const warmupLabel = temporalHud.phase === 'cooldown' ? 'Rearm' : 'Warmup';
+    const warmupProgressValue = temporalHud.phase === 'cooldown'
+        ? `${(temporalHud.cooldownRemainingMs / 1000).toFixed(1)}s`
+        : `${Math.min(temporalHud.signalFrames, LSTM_MIN_INFERENCE_FRAMES)}/${LSTM_MIN_INFERENCE_FRAMES}`;
 
     return (
         <div className={`relative overflow-hidden rounded-2xl border bg-[#eef5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition-all duration-500 ${isActive ? 'camera-live-shell border-[#9fc9ff] shadow-[0_18px_36px_rgba(0,127,255,0.22)]' : 'border-[#c9defd]'}`}>
@@ -570,13 +725,13 @@ export function WebcamPane({
                     <div className="absolute bottom-3 left-3 w-[min(232px,calc(100%-1.5rem))] rounded-2xl border border-[#d6e5fb] bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(244,249,255,0.92)_100%)] px-3 py-2.5 text-text shadow-[0_14px_28px_rgba(15,34,68,0.14)] backdrop-blur-sm">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
-                                <span className={`h-2 w-2 rounded-full transition-all duration-300 ${temporalHud.inFlight ? 'bg-[#ff8a50] shadow-[0_0_10px_rgba(255,138,80,0.55)]' : temporalHud.hasSignal ? 'bg-brand shadow-[0_0_10px_rgba(0,127,255,0.35)]' : 'bg-[#a8bfdc]'}`} />
+                                <span className={`h-2 w-2 rounded-full transition-all duration-300 ${temporalPhaseDotClass}`} />
                                 <span className="text-[0.64rem] font-bold uppercase tracking-[0.18em] text-muted">
-                                    {temporalHud.inFlight ? 'Scanning' : temporalHud.hasSignal ? 'Tracking' : 'Idle'}
+                                    {temporalPhaseLabel}
                                 </span>
                             </div>
                             <span className="rounded-full border border-[#ffd4bf] bg-[#fff4ed] px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.18em] text-[#c85a21]">
-                                Continuous
+                                Segmented
                             </span>
                         </div>
 
@@ -589,9 +744,7 @@ export function WebcamPane({
                                     / {LSTM_N_FRAMES}
                                 </span>
                             </div>
-                            <div className="text-[0.58rem] font-bold uppercase tracking-[0.18em] text-muted">
-                                Window
-                            </div>
+                            <div className="text-[0.58rem] font-bold uppercase tracking-[0.18em] text-muted">{segmentLabel}</div>
                         </div>
 
                         <div className="mt-2 grid grid-cols-12 gap-1">
@@ -609,8 +762,8 @@ export function WebcamPane({
                         <div className="mt-2.5 flex items-center justify-between gap-3">
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between text-[0.56rem] font-bold uppercase tracking-[0.18em] text-muted">
-                                    <span>Warmup</span>
-                                    <span>{Math.min(temporalHud.signalFrames, LSTM_MIN_INFERENCE_FRAMES)}/{LSTM_MIN_INFERENCE_FRAMES}</span>
+                                    <span>{warmupLabel}</span>
+                                    <span>{warmupProgressValue}</span>
                                 </div>
                                 <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#dbe8fb]">
                                     <div
