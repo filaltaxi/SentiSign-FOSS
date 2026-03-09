@@ -424,6 +424,7 @@ export const Communicate: React.FC = () => {
                             sentence={sentence}
                             audioUrl={audioUrl}
                             audioFilename={audioFilename}
+                            generationStage={generationStage}
                         />
                     </div>
                 </section>

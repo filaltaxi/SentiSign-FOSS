@@ -93,6 +93,32 @@
     }
   }
 
+  @keyframes audio-processing-dot {
+    0%,
+    100% {
+      transform: translateY(0) scale(0.82);
+      opacity: 0.38;
+    }
+    50% {
+      transform: translateY(-4px) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes audio-processing-sheen {
+    0% {
+      transform: translateX(0);
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(420%);
+      opacity: 0;
+    }
+  }
+
   .camera-live-shell {
     box-shadow: 0 0 0 1px rgba(191, 223, 255, 0.8), 0 16px 30px rgba(0, 127, 255, 0.16);
   }
@@ -112,6 +138,15 @@
     background: linear-gradient(180deg, #007fff, #4ea9ff);
     animation: waveform-bar 940ms ease-in-out infinite;
     transform-origin: bottom center;
+  }
+
+  .audio-processing-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #7db8ff, #3399ff);
+    box-shadow: 0 0 0 4px rgba(51, 153, 255, 0.12);
+    animation: audio-processing-dot 0.9s ease-in-out infinite;
   }
 
   .btn {

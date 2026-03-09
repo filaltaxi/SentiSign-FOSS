@@ -7,17 +7,20 @@ interface SentenceOutputProps {
     sentence: string | null;
     audioUrl?: string | null;
     audioFilename?: string | null;
+    generationStage?: 'idle' | 'sentence' | 'audio';
 }
 
 export function SentenceOutput({
     sentence,
     audioUrl,
     audioFilename,
+    generationStage = 'idle',
 }: SentenceOutputProps) {
     const [typedSentence, setTypedSentence] = useState<string>('');
     const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
     const [autoplayBlocked, setAutoplayBlocked] = useState<boolean>(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const showAudioProcessing = generationStage === 'audio' && !audioUrl;
 
     useEffect(() => {
         if (!sentence) {
@@ -112,6 +115,29 @@ export function SentenceOutput({
                     </p>
                 )}
             </div>
+
+            {showAudioProcessing && (
+                <div className="animate-in fade-in zoom-in-95 duration-300">
+                    <div className="relative overflow-hidden rounded-[999px] border border-[#cfe2ff] bg-[linear-gradient(180deg,#f8fbff_0%,#eaf3ff_100%)] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_14px_24px_rgba(15,34,68,0.08)]">
+                        <div className="pointer-events-none absolute inset-y-0 left-[-35%] w-[35%] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.9),transparent)] animate-[audio-processing-sheen_1.8s_ease-in-out_infinite]" />
+                        <div className="relative flex min-h-[46px] items-center justify-center gap-3">
+                            <div className="flex items-center gap-1.5" aria-hidden="true">
+                                <span className="audio-processing-dot [animation-delay:0ms]" />
+                                <span className="audio-processing-dot [animation-delay:180ms]" />
+                                <span className="audio-processing-dot [animation-delay:360ms]" />
+                            </div>
+                            <div className="flex flex-col items-start">
+                                <span className="text-[0.72rem] font-extrabold uppercase tracking-[0.18em] text-[#5c7fa9]">
+                                    Processing Audio
+                                </span>
+                                <span className="text-[0.82rem] font-semibold text-[#54749c]">
+                                    Preparing the spoken output...
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {audioUrl && (
                 <div className="flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-400">
